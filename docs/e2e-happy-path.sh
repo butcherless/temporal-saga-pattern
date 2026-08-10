@@ -8,6 +8,8 @@
 # inventory-service and payment-service already running (see CLAUDE.md).
 set -euo pipefail
 
+command -v jq >/dev/null || { echo "jq is required (brew install jq)" >&2; exit 1; }
+
 ORDER_SERVICE_URL="http://localhost:8081"
 TEMPORAL_UI_URL="http://localhost:8088"
 
@@ -22,14 +24,14 @@ STATUS=$(echo "${RESPONSE}" | tail -n 1)
 BODY=$(echo "${RESPONSE}" | sed '$d')
 
 echo "HTTP ${STATUS}"
-echo "${BODY}"
+echo "${BODY}" | jq .
 
 if [ "${STATUS}" != "202" ]; then
   echo "Expected 202 Accepted, got ${STATUS}" >&2
   exit 1
 fi
 
-SAGA_ID=$(echo "${BODY}" | grep -o '"sagaId":"[^"]*"' | cut -d'"' -f4)
+SAGA_ID=$(echo "${BODY}" | jq -r '.sagaId')
 echo
 echo "sagaId=${SAGA_ID}"
 echo "Workflow Id (same as businessKey): ${BUSINESS_KEY}"

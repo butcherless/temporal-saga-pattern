@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.company.saga</groupId>
+    <artifactId>distributed-saga-platform-temporal</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>distributed-saga-platform-temporal</name>
+    <description>Orchestrated Saga on Java, Spring Boot, PostgreSQL and Temporal</description>
+
+    <modules>
+        <module>saga-common</module>
+        <module>saga-orchestrator-temporal</module>
+        <module>order-service</module>
+        <module>inventory-service</module>
+        <module>payment-service</module>
+        <module>platform-test</module>
+    </modules>
+
+    <properties>
+        <java.version>25</java.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <maven.min.version>3.9.0</maven.min.version>
+
+        <spring-boot.version>4.1.0</spring-boot.version>
+        <!-- 1.34.0+ added Spring Boot 4 support; not managed by the Spring Boot BOM. -->
+        <temporal.version>1.37.0</temporal.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
+        <!-- Matches the version the Spring Boot BOM manages; pinned explicitly because
+             annotationProcessorPaths entries below don't inherit from dependencyManagement. -->
+        <lombok.version>1.18.46</lombok.version>
+
+        <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+        <!-- Not managed by the Spring Boot BOM; only modules with Testcontainers-based
+             integration tests (*IT.java) bind this plugin explicitly. -->
+        <maven-failsafe-plugin.version>3.5.5</maven-failsafe-plugin.version>
+        <!-- 0.8.15 is the first release with official (not experimental) Java 25 class-file support. -->
+        <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- temporal-sdk's own transitive graph reaches these two utility libraries at
+                 several different versions across its own paths (gson -> error_prone_annotations
+                 2.41.0, guava -> 2.36.0, grpc-api/-stub/-netty-shaded/-services/-core -> 2.45.0,
+                 protobuf-java-util -> 2.18.0; guava itself at 33.4.8-android directly and
+                 33.5.0-android/33.5.0-jre transitively) — an internal inconsistency in that SDK's
+                 own POM tree, not something the Spring Boot BOM's own pinning causes (confirmed
+                 via `mvn dependency:tree -Dverbose`). Pinned here to the highest version seen so
+                 both dependencyConvergence and requireUpperBoundDeps resolve deterministically. -->
+            <dependency>
+                <groupId>com.google.errorprone</groupId>
+                <artifactId>error_prone_annotations</artifactId>
+                <version>2.45.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>33.5.0-android</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                    <!-- Same repackage/verify/classifier=exec setup as saga-pattern-poc's root pom:
+                         spring-boot-starter-parent isn't inherited here either, so repackage needs
+                         an explicit execution. Bound to verify (not package) and with a separate
+                         "exec" classifier for the same reasons documented there — see that repo's
+                         pom.xml comment if this ever needs re-deriving. -->
+                    <executions>
+                        <execution>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                            <configuration>
+                                <classifier>exec</classifier>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>${maven-failsafe-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>integration-test</goal>
+                                <goal>verify</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco-maven-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${maven-enforcer-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>enforce-build-rules</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <fail>true</fail>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[${java.version},)</version>
+                                </requireJavaVersion>
+                                <requireMavenVersion>
+                                    <version>[${maven.min.version},)</version>
+                                </requireMavenVersion>
+                                <banDuplicatePomDependencyVersions/>
+                                <dependencyConvergence/>
+                                <requireUpperBoundDeps>
+                                    <excludes>
+                                        <!-- The Spring Boot BOM deliberately pins these io.prometheus versions
+                                             below what micrometer-registry-prometheus itself declares, as part
+                                             of its tested compatibility matrix. Same exclusion as
+                                             saga-pattern-poc's root pom. -->
+                                        <exclude>io.prometheus:prometheus-metrics-core</exclude>
+                                        <exclude>io.prometheus:prometheus-metrics-exposition-formats</exclude>
+                                        <exclude>io.prometheus:prometheus-metrics-tracer-common</exclude>
+                                        <!-- Same pattern: the Spring Boot 4.1.0 BOM pins these two legacy
+                                             Jackson 2.x artifacts (used internally by swagger-core-jakarta,
+                                             pulled in transitively by springdoc-openapi-starter-webflux-ui)
+                                             below what swagger-core-jakarta itself was built against. -->
+                                        <exclude>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</exclude>
+                                        <exclude>com.fasterxml.jackson.dataformat:jackson-dataformat-yaml</exclude>
+                                        <!-- Not a real upper-bound violation: dependencyConvergence already
+                                             passes cleanly once guava/error_prone_annotations are pinned above,
+                                             but RequireUpperBoundDeps still flags guava paths, including ones
+                                             where its own reported "managed" version and the version it claims
+                                             to override are identical (both "33.5.0-android" on the same line).
+                                             That's this rule's version comparator mishandling Guava's non-semver
+                                             "-android"/"-jre" flavor qualifier on temporal-sdk's transitive
+                                             graph, not an actual inconsistency (confirmed via
+                                             mvn dependency:tree -Dverbose). -->
+                                        <exclude>com.google.guava:guava</exclude>
+                                    </excludes>
+                                </requireUpperBoundDeps>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>jacoco-prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>jacoco-report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

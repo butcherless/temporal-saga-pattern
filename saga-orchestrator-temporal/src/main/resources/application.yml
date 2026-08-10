@@ -1,0 +1,37 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: saga-orchestrator-temporal
+  temporal:
+    connection:
+      target: ${TEMPORAL_TARGET:localhost:7233}
+    workers:
+      - task-queue: order-saga-task-queue
+        workflow-classes:
+          - com.company.saga.orchestrator.workflow.OrderSagaWorkflowImpl
+        activity-beans:
+          - inventoryActivitiesImpl
+          - paymentActivitiesImpl
+          - orderActivitiesImpl
+
+services:
+  order:
+    base-url: ${ORDER_SERVICE_URL:http://localhost:8081}
+  inventory:
+    base-url: ${INVENTORY_SERVICE_URL:http://localhost:8082}
+  payment:
+    base-url: ${PAYMENT_SERVICE_URL:http://localhost:8083}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+# DEBUG for this app's own code only (not Spring/Temporal/etc) — logback-spring.xml's root
+# stays at INFO in every profile.
+logging:
+  level:
+    com.company.saga: DEBUG

@@ -1,0 +1,32 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: payment-service
+  webflux:
+    problemdetails:
+      enabled: true
+  r2dbc:
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/payment_db
+    username: ${DB_USERNAME:saga}
+    password: ${DB_PASSWORD:saga}
+  # JDBC datasource used only by Flyway and by DataSourceAutoConfiguration's primary
+  # DataSource bean (re-imported in the application class); the app itself talks to
+  # PostgreSQL reactively via spring.r2dbc above.
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/payment_db
+    username: ${DB_USERNAME:saga}
+    password: ${DB_PASSWORD:saga}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+# DEBUG for this app's own code only (not Spring/R2DBC/etc) — logback-spring.xml's root
+# stays at INFO in every profile.
+logging:
+  level:
+    com.company.saga: DEBUG

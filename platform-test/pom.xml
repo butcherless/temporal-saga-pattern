@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.company.saga</groupId>
+        <artifactId>distributed-saga-platform-temporal</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>platform-test</artifactId>
+    <packaging>jar</packaging>
+
+    <name>platform-test</name>
+    <description>End-to-end Testcontainers-Postgres + Temporal dev server test: boots all four services as real forked JVM processes and drives one full happy-path saga through POST /orders.</description>
+
+    <dependencies>
+        <!-- Brings in temporal-sdk transitively (WorkflowClient/WorkflowServiceStubs), used to
+             assert the Workflow Execution itself closed as COMPLETED. -->
+        <dependency>
+            <groupId>com.company.saga</groupId>
+            <artifactId>saga-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Not used in-process (this IT never starts a Spring context of its own — each service
+             runs as its own forked `java -jar` process, see TemporalEndToEndSagaIT). Declared
+             purely so Maven's reactor build order guarantees their jars already exist (built by
+             the package phase) by the time this module's integration-test phase runs. -->
+        <dependency>
+            <groupId>com.company.saga</groupId>
+            <artifactId>order-service</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.company.saga</groupId>
+            <artifactId>inventory-service</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.company.saga</groupId>
+            <artifactId>payment-service</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.company.saga</groupId>
+            <artifactId>saga-orchestrator-temporal</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- JDBC-only, to poll customer_order.status directly against the shared Testcontainers
+             Postgres instance, in addition to asserting on the Workflow Execution's own status. -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Versions come from the Spring Boot BOM's imported testcontainers-bom, so none are
+             declared explicitly here (same as every other module's Postgres IT). -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Runs *IT.java (Testcontainers, needs Docker) during integration-test/verify,
+                 keeping mvn test (surefire, *Test.java) Docker-free and fast. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <!-- Lets the IT compute each sibling module's built jar path
+                             (../<module>/target/<module>-${saga.platform.version}.jar) without
+                             hardcoding the version. -->
+                        <saga.platform.version>${project.version}</saga.platform.version>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

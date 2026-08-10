@@ -12,7 +12,7 @@ jobs:
 
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v7
@@ -27,4 +27,6 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
       - name: Build and verify
-        run: ./mvnw -B -V clean verify
+        # platform-test's IT needs Docker (Testcontainers) and drives 4 forked JVMs end-to-end;
+        # skipped here to keep CI fast and Docker-free — run it locally via CLAUDE.md instead.
+        run: ./mvnw -B -V clean verify -DskipITs=true

@@ -30,3 +30,7 @@ jobs:
         # platform-test's IT needs Docker (Testcontainers) and drives 4 forked JVMs end-to-end;
         # skipped here to keep CI fast and Docker-free — run it locally via CLAUDE.md instead.
         run: ./mvnw -B -V clean verify -DskipITs=true
+      - name: Compile the custom OpenRewrite recipes
+        # Deliberately outside the reactor's <modules> (ad hoc, not part of the build — see
+        # CLAUDE.md), but its source still lives in this repo, so compile-check it here.
+        run: cd tooling/openrewrite-one-param-per-line && mvn -B -V compile

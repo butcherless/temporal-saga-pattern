@@ -1,5 +1,7 @@
 package com.company.saga.order.web;
 
+import com.company.saga.common.error.PermanentSagaException;
+import com.company.saga.common.error.TemporarySagaException;
 import com.company.saga.order.domain.CustomerOrder;
 import com.company.saga.order.domain.IllegalOrderTransitionException;
 import com.company.saga.order.domain.OrderStatus;
@@ -11,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.reactive.server.WebTestClient.ResponseSpec;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -55,16 +58,13 @@ class OrderControllerTest {
 
     @Test
     void createOrderRejectsAnInvalidRequestBodyWithAProblemDetail() {
-        client.post().uri("/orders")
+        final ResponseSpec response = client.post().uri("/orders")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sku":"SKU-001","quantity":-1,"amount":49.99}""")
-                .exchange()
-                .expectStatus().isBadRequest()
-                .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .expectBody()
-                .jsonPath("$.status").isEqualTo(400)
-                .jsonPath("$.detail").isEqualTo("quantity must be positive");
+                .exchange();
+
+        assertProblemDetail(response, 400, "quantity must be positive");
     }
 
     @Test
@@ -93,6 +93,29 @@ class OrderControllerTest {
                 .expectBody()
                 .jsonPath("$.sagaId").isEqualTo(sagaId.toString())
                 .jsonPath("$.status").isEqualTo(OrderStatus.CANCELLED.name());
+    }
+
+    @Test
+    void confirmOrderReturns422WhenTheConfirmationPermanentlyFails() {
+        final UUID sagaId = UUID.randomUUID();
+        when(orderProgressionService.confirmOrder(any()))
+                .thenReturn(Mono.error(new PermanentSagaException(
+                        "Simulated unrecoverable order confirmation failure for businessKey ORDER-2026-CONFIRMFAIL-INPUTDATA-7")));
+
+        final ResponseSpec response = client.post().uri("/orders/{sagaId}/confirm", sagaId).exchange();
+
+        assertProblemDetail(response, 422, "Simulated unrecoverable order confirmation failure for businessKey ORDER-2026-CONFIRMFAIL-INPUTDATA-7");
+    }
+
+    @Test
+    void confirmOrderReturns503WhenTheGatewayTimesOut() {
+        final UUID sagaId = UUID.randomUUID();
+        when(orderProgressionService.confirmOrder(any()))
+                .thenReturn(Mono.error(new TemporarySagaException("Simulated order confirmation gateway timeout")));
+
+        final ResponseSpec response = client.post().uri("/orders/{sagaId}/confirm", sagaId).exchange();
+
+        assertProblemDetail(response, 503, "Simulated order confirmation gateway timeout");
     }
 
     /**
@@ -126,5 +149,18 @@ class OrderControllerTest {
         client.post().uri("/orders/{sagaId}/cancel", sagaId)
                 .exchange()
                 .expectStatus().is5xxServerError();
+    }
+
+    /**
+     * Shared shape behind every {@code ProblemDetail} assertion above (400 for bad input, 422/503
+     * for the two {@code SagaException} classifications): status code, {@code application/problem+json}
+     * content type, and the {@code $.status}/{@code $.detail} body fields.
+     */
+    private static void assertProblemDetail(final ResponseSpec response, final int expectedStatus, final String expectedDetail) {
+        response.expectStatus().isEqualTo(expectedStatus)
+                .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(expectedStatus)
+                .jsonPath("$.detail").isEqualTo(expectedDetail);
     }
 }

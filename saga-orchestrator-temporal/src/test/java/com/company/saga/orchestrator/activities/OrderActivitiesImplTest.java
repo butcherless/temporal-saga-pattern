@@ -1,5 +1,6 @@
 package com.company.saga.orchestrator.activities;
 
+import io.temporal.failure.ApplicationFailure;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,6 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
 
 import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(MockitoExtension.class)
 class OrderActivitiesImplTest {
@@ -31,6 +34,18 @@ class OrderActivitiesImplTest {
         activities.confirmOrder(sagaId);
 
         ExchangeFunctionStub.assertPostedTo(exchangeFunction, "/orders/%s/confirm".formatted(sagaId));
+    }
+
+    @Test
+    void confirmOrderThrowsANonRetryableFailureWhenTheConfirmationPermanentlyFails() {
+        ExchangeFunctionStub.stubResponse(
+                exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT,
+                "Simulated unrecoverable order confirmation failure for businessKey ORDER-2026-CONFIRMFAIL-INPUTDATA-7");
+
+        assertThatThrownBy(() -> activities.confirmOrder(UUID.randomUUID()))
+                .isInstanceOf(ApplicationFailure.class)
+                .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
+                .isEqualTo(true);
     }
 
     @Test

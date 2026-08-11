@@ -1,9 +1,13 @@
 package com.company.saga.order.web;
 
+import com.company.saga.common.error.PermanentSagaException;
+import com.company.saga.common.error.TemporarySagaException;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.reactive.result.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.web.server.ServerWebExchange;
@@ -27,6 +31,13 @@ import reactor.core.publisher.Mono;
  * stays on the base class's own built-in RFC 9457 handling, with
  * {@code spring.webflux.problemdetails.enabled} as the backstop for whatever neither of these
  * touches.
+ *
+ * <p>{@link PermanentSagaException}/{@link TemporarySagaException} are mapped explicitly (422/503),
+ * same as {@code inventory-service}'s/{@code payment-service}'s own {@code RestExceptionHandler}s —
+ * so {@code saga-orchestrator-temporal}'s {@code OrderActivitiesImpl} can tell a definitive
+ * business rejection from a transient gateway fault over the wire, the same way it already can for
+ * the other two Activities, instead of {@code confirmOrder} retrying a deterministic failure to
+ * exhaustion before compensating.
  */
 @RestControllerAdvice
 public class RestExceptionHandler extends ResponseEntityExceptionHandler {
@@ -40,5 +51,19 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
         final Throwable cause = ex.getMostSpecificCause();
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, cause.getMessage());
         return handleExceptionInternal(ex, problemDetail, headers, status, exchange);
+    }
+
+    @ExceptionHandler(PermanentSagaException.class)
+    public Mono<ResponseEntity<Object>> handlePermanentSagaException(
+            final PermanentSagaException ex, final ServerWebExchange exchange) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage());
+        return handleExceptionInternal(ex, problemDetail, new HttpHeaders(), HttpStatus.UNPROCESSABLE_CONTENT, exchange);
+    }
+
+    @ExceptionHandler(TemporarySagaException.class)
+    public Mono<ResponseEntity<Object>> handleTemporarySagaException(
+            final TemporarySagaException ex, final ServerWebExchange exchange) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        return handleExceptionInternal(ex, problemDetail, new HttpHeaders(), HttpStatus.SERVICE_UNAVAILABLE, exchange);
     }
 }

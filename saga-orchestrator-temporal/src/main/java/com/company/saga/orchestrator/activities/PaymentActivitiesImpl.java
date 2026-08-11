@@ -24,7 +24,8 @@ public class PaymentActivitiesImpl implements PaymentActivities {
     }
 
     @Override
-    public void requestPayment(final UUID sagaId, final BigDecimal amount) {
+    public void requestPayment(final UUID sagaId,
+            final BigDecimal amount) {
         log.debug("requestPayment - sagaId={}, amount={}", sagaId, amount);
         paymentWebClient.post()
                 .uri("/payments")

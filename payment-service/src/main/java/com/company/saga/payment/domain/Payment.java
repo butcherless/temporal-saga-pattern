@@ -41,7 +41,9 @@ public record Payment(
     }
 
     /** Creates a brand-new payment request, in {@link PaymentStatus#PENDING} at its first attempt. */
-    public static Payment request(final UUID sagaId, final BigDecimal amount, final Instant now) {
+    public static Payment request(final UUID sagaId,
+            final BigDecimal amount,
+            final Instant now) {
         Objects.requireNonNull(sagaId, "sagaId must not be null");
         return new Payment(sagaId, amount, PaymentStatus.PENDING, 1, now, now, null);
     }
@@ -79,7 +81,8 @@ public record Payment(
         return advanceTo(PaymentStatus.REFUNDED, now);
     }
 
-    private Payment advanceTo(final PaymentStatus target, final Instant now) {
+    private Payment advanceTo(final PaymentStatus target,
+            final Instant now) {
         Objects.requireNonNull(now, "now must not be null");
         if (!status.canTransitionTo(target)) {
             throw new IllegalPaymentTransitionException(status, target);

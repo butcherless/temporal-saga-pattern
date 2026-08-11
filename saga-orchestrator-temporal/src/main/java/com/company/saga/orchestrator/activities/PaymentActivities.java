@@ -11,7 +11,8 @@ import java.util.UUID;
 public interface PaymentActivities {
 
     @ActivityMethod
-    void requestPayment(UUID sagaId, BigDecimal amount);
+    void requestPayment(UUID sagaId,
+            BigDecimal amount);
 
     /** Compensation: reverses a completed charge. */
     @ActivityMethod

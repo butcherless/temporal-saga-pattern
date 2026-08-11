@@ -74,7 +74,8 @@ public class PaymentProgressionService {
                                 .then(Mono.defer(() -> paymentRepository.save(payment.refund(request.now())))));
     }
 
-    private Mono<Payment> evaluate(final Payment candidate, final Instant now) {
+    private Mono<Payment> evaluate(final Payment candidate,
+            final Instant now) {
         final BigDecimal amount = candidate.amount();
         if (amount.compareTo(HARD_DECLINE_THRESHOLD) >= 0) {
             return paymentRepository.save(candidate.fail(now))

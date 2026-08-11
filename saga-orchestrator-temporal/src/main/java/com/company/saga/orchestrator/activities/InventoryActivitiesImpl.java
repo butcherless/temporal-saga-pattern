@@ -23,7 +23,9 @@ public class InventoryActivitiesImpl implements InventoryActivities {
     }
 
     @Override
-    public void reserveStock(final UUID sagaId, final String sku, final Integer quantity) {
+    public void reserveStock(final UUID sagaId,
+            final String sku,
+            final Integer quantity) {
         log.debug("reserveStock - sagaId={}, sku={}, quantity={}", sagaId, sku, quantity);
         inventoryWebClient.post()
                 .uri("/inventory/reservations")

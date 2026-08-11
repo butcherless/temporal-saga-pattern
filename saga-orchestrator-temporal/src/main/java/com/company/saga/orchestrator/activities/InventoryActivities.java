@@ -10,7 +10,9 @@ import java.util.UUID;
 public interface InventoryActivities {
 
     @ActivityMethod
-    void reserveStock(UUID sagaId, String sku, Integer quantity);
+    void reserveStock(UUID sagaId,
+            String sku,
+            Integer quantity);
 
     @ActivityMethod
     void confirmReservation(UUID sagaId);

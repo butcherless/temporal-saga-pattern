@@ -40,7 +40,10 @@ public record InventoryReservation(
     }
 
     /** Creates a brand-new reservation, in {@link ReservationStatus#RESERVED}. */
-    public static InventoryReservation reserve(final UUID sagaId, final String sku, final int quantity, final Instant now) {
+    public static InventoryReservation reserve(final UUID sagaId,
+            final String sku,
+            final int quantity,
+            final Instant now) {
         Objects.requireNonNull(sagaId, "sagaId must not be null");
         return new InventoryReservation(sagaId, sku, quantity, ReservationStatus.RESERVED, now, now, null);
     }
@@ -63,7 +66,8 @@ public record InventoryReservation(
         return advanceTo(ReservationStatus.RELEASED, now);
     }
 
-    private InventoryReservation advanceTo(final ReservationStatus target, final Instant now) {
+    private InventoryReservation advanceTo(final ReservationStatus target,
+            final Instant now) {
         Objects.requireNonNull(now, "now must not be null");
         if (!status.canTransitionTo(target)) {
             throw new IllegalReservationTransitionException(status, target);

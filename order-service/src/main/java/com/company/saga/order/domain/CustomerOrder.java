@@ -37,7 +37,9 @@ public record CustomerOrder(
     }
 
     /** Creates a brand-new order, in {@link OrderStatus#PENDING}. */
-    public static CustomerOrder create(final UUID sagaId, final String businessKey, final Instant now) {
+    public static CustomerOrder create(final UUID sagaId,
+            final String businessKey,
+            final Instant now) {
         Objects.requireNonNull(sagaId, "sagaId must not be null");
         return new CustomerOrder(sagaId, businessKey, OrderStatus.PENDING, now, now, null);
     }
@@ -60,7 +62,8 @@ public record CustomerOrder(
         return advanceTo(OrderStatus.CANCELLED, now);
     }
 
-    private CustomerOrder advanceTo(final OrderStatus target, final Instant now) {
+    private CustomerOrder advanceTo(final OrderStatus target,
+            final Instant now) {
         Objects.requireNonNull(now, "now must not be null");
         if (!status.canTransitionTo(target)) {
             throw new IllegalOrderTransitionException(status, target);

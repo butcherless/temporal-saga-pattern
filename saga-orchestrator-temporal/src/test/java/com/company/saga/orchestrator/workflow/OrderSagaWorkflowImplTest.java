@@ -152,7 +152,8 @@ class OrderSagaWorkflowImplTest {
                 "cancelOrder(%s)".formatted(sagaId));
     }
 
-    private OrderSagaWorkflow newWorkflowStub(final String businessKey, final FakeActivities activities) {
+    private OrderSagaWorkflow newWorkflowStub(final String businessKey,
+            final FakeActivities activities) {
         testEnv = TestWorkflowEnvironment.newInstance();
         final Worker worker = testEnv.newWorker(TASK_QUEUE);
         worker.registerWorkflowImplementationTypes(OrderSagaWorkflowImpl.class);
@@ -190,7 +191,9 @@ class OrderSagaWorkflowImplTest {
         }
 
         @Override
-        public void reserveStock(final UUID sagaId, final String sku, final Integer quantity) {
+        public void reserveStock(final UUID sagaId,
+                final String sku,
+                final Integer quantity) {
             callLog.add("reserveStock(%s,%s,%s)".formatted(sagaId, sku, quantity));
             if (reserveStockFailsPermanently) {
                 throw ApplicationFailure.newNonRetryableFailure(
@@ -212,7 +215,8 @@ class OrderSagaWorkflowImplTest {
         }
 
         @Override
-        public void requestPayment(final UUID sagaId, final BigDecimal amount) {
+        public void requestPayment(final UUID sagaId,
+                final BigDecimal amount) {
             callLog.add("requestPayment(%s,%s)".formatted(sagaId, amount));
         }
 

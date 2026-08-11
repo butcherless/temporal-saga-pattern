@@ -59,7 +59,9 @@ public class OrderCreationHandler {
      * defense against the narrow race where two concurrent duplicate requests both observe no
      * existing order — either way, the caller sees the same successful, idempotent outcome.
      */
-    private Mono<Void> startSagaIfNewlyCreated(final CustomerOrder order, final UUID sagaId, final CreateOrderRequestBody request) {
+    private Mono<Void> startSagaIfNewlyCreated(final CustomerOrder order,
+            final UUID sagaId,
+            final CreateOrderRequestBody request) {
         if (!order.id().equals(sagaId)) {
             return Mono.empty();
         }

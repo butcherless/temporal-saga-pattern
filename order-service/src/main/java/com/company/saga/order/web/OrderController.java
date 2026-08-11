@@ -34,7 +34,8 @@ public class OrderController {
     private final OrderCreationHandler orderCreationHandler;
     private final OrderProgressionService orderProgressionService;
 
-    public OrderController(final OrderCreationHandler orderCreationHandler, final OrderProgressionService orderProgressionService) {
+    public OrderController(final OrderCreationHandler orderCreationHandler,
+            final OrderProgressionService orderProgressionService) {
         this.orderCreationHandler = Objects.requireNonNull(orderCreationHandler, "orderCreationHandler must not be null");
         this.orderProgressionService = Objects.requireNonNull(orderProgressionService, "orderProgressionService must not be null");
     }

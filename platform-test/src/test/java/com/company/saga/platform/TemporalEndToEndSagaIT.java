@@ -231,14 +231,18 @@ class TemporalEndToEndSagaIT {
         assertPaymentStatus(sagaId, "REFUNDED");
     }
 
-    private void postOrderAndAwaitConfirmed(final String sku, final int quantity, final String amount) throws Exception {
+    private void postOrderAndAwaitConfirmed(final String sku,
+            final int quantity,
+            final String amount) throws Exception {
         final String businessKey = postOrder(sku, quantity, amount);
 
         awaitWorkflowCompleted(businessKey);
         awaitOrderStatus(businessKey, "CONFIRMED");
     }
 
-    private void postOrderAndAwaitFailed(final String sku, final int quantity, final String amount) throws Exception {
+    private void postOrderAndAwaitFailed(final String sku,
+            final int quantity,
+            final String amount) throws Exception {
         final String businessKey = postOrder(sku, quantity, amount);
 
         awaitWorkflowFailed(businessKey);
@@ -262,13 +266,18 @@ class TemporalEndToEndSagaIT {
         awaitOrderStatus(businessKey, "CONFIRMED");
     }
 
-    private String postOrder(final String sku, final int quantity, final String amount) throws Exception {
+    private String postOrder(final String sku,
+            final int quantity,
+            final String amount) throws Exception {
         final String businessKey = "ORDER-2026-E2E-%s".formatted(UUID.randomUUID());
         assertThat(postOrderWithBusinessKey(businessKey, sku, quantity, amount)).isEqualTo(202);
         return businessKey;
     }
 
-    private int postOrderWithBusinessKey(final String businessKey, final String sku, final int quantity, final String amount) throws Exception {
+    private int postOrderWithBusinessKey(final String businessKey,
+            final String sku,
+            final int quantity,
+            final String amount) throws Exception {
         final String requestBody = """
                 {"sku":"%s","quantity":%d,"amount":%s,"businessKey":"%s"}""".formatted(sku, quantity, amount, businessKey);
 
@@ -289,7 +298,9 @@ class TemporalEndToEndSagaIT {
         return builder.start();
     }
 
-    private static Process startBusinessService(final String module, final Path logDir, final boolean startsWorkflows) throws IOException {
+    private static Process startBusinessService(final String module,
+            final Path logDir,
+            final boolean startsWorkflows) throws IOException {
         final ProcessBuilder builder = execJarProcessBuilder(module, logDir);
         builder.environment().put("DB_HOST", POSTGRES.getHost());
         builder.environment().put("DB_PORT", String.valueOf(POSTGRES.getMappedPort(5432)));
@@ -301,7 +312,8 @@ class TemporalEndToEndSagaIT {
         return builder.start();
     }
 
-    private static ProcessBuilder execJarProcessBuilder(final String module, final Path logDir) {
+    private static ProcessBuilder execJarProcessBuilder(final String module,
+            final Path logDir) {
         final String version = System.getProperty("saga.platform.version");
         final Path jar = Path.of("..", module, "target", module + "-" + version + "-exec.jar").toAbsolutePath().normalize();
         final ProcessBuilder builder = new ProcessBuilder("java", "-jar", jar.toString());
@@ -366,25 +378,29 @@ class TemporalEndToEndSagaIT {
                 resultSet -> (UUID) resultSet.getObject("id"));
     }
 
-    private static void assertReservationStatus(final UUID sagaId, final String expectedStatus) throws SQLException {
+    private static void assertReservationStatus(final UUID sagaId,
+            final String expectedStatus) throws SQLException {
         final String status = queryOne("inventory_db", "SELECT status FROM inventory_reservation WHERE id = ?", sagaId,
                 resultSet -> resultSet.getString("status"));
         assertThat(status).isEqualTo(expectedStatus);
     }
 
-    private static void assertPaymentStatus(final UUID sagaId, final String expectedStatus) throws SQLException {
+    private static void assertPaymentStatus(final UUID sagaId,
+            final String expectedStatus) throws SQLException {
         final String status = queryOne("payment_db", "SELECT status FROM payment WHERE id = ?", sagaId,
                 resultSet -> resultSet.getString("status"));
         assertThat(status).isEqualTo(expectedStatus);
     }
 
-    private static void assertOrderStatus(final String businessKey, final String expectedStatus) throws SQLException {
+    private static void assertOrderStatus(final String businessKey,
+            final String expectedStatus) throws SQLException {
         final String status = queryOne("order_db", "SELECT status FROM customer_order WHERE business_key = ?", businessKey,
                 resultSet -> resultSet.getString("status"));
         assertThat(status).isEqualTo(expectedStatus);
     }
 
-    private static void awaitOrderStatus(final String businessKey, final String expectedStatus) throws Exception {
+    private static void awaitOrderStatus(final String businessKey,
+            final String expectedStatus) throws Exception {
         final Instant deadline = Instant.now().plus(SAGA_TIMEOUT);
         String lastSeenStatus = null;
 
@@ -410,14 +426,20 @@ class TemporalEndToEndSagaIT {
      * a one-parameter {@code SELECT} by id or business key, so the connection/statement/result-set
      * lifecycle lives here once instead of once per accessor.
      */
-    private static <T> T queryOne(final String database, final String sql, final Object param, final ResultSetExtractor<T> extractor)
+    private static <T> T queryOne(final String database,
+            final String sql,
+            final Object param,
+            final ResultSetExtractor<T> extractor)
             throws SQLException {
         return queryOptional(database, sql, param, extractor)
                 .orElseThrow(() -> new AssertionError("Query returned no row: %s".formatted(sql)));
     }
 
     private static <T> Optional<T> queryOptional(
-            final String database, final String sql, final Object param, final ResultSetExtractor<T> extractor) throws SQLException {
+            final String database,
+            final String sql,
+            final Object param,
+            final ResultSetExtractor<T> extractor) throws SQLException {
         final String jdbcUrl = "jdbc:postgresql://%s:%d/%s".formatted(POSTGRES.getHost(), POSTGRES.getMappedPort(5432), database);
         try (Connection connection = DriverManager.getConnection(jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword());
              PreparedStatement statement = connection.prepareStatement(sql)) {

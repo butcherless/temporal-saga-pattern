@@ -24,7 +24,9 @@ public class VirtualThreadWorkerOptionsCustomizer implements WorkerOptionsCustom
 
     @Override
     public WorkerOptions.Builder customize(
-            final WorkerOptions.Builder optionsBuilder, final String workerName, final String taskQueue) {
+            final WorkerOptions.Builder optionsBuilder,
+            final String workerName,
+            final String taskQueue) {
         return optionsBuilder.setUsingVirtualThreadsOnActivityWorker(true);
     }
 }

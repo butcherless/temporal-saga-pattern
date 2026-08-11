@@ -40,14 +40,16 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(PermanentSagaException.class)
     public Mono<ResponseEntity<Object>> handlePermanentSagaException(
-            final PermanentSagaException ex, final ServerWebExchange exchange) {
+            final PermanentSagaException ex,
+            final ServerWebExchange exchange) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage());
         return handleExceptionInternal(ex, problemDetail, new HttpHeaders(), HttpStatus.UNPROCESSABLE_CONTENT, exchange);
     }
 
     @ExceptionHandler(TemporarySagaException.class)
     public Mono<ResponseEntity<Object>> handleTemporarySagaException(
-            final TemporarySagaException ex, final ServerWebExchange exchange) {
+            final TemporarySagaException ex,
+            final ServerWebExchange exchange) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
         return handleExceptionInternal(ex, problemDetail, new HttpHeaders(), HttpStatus.SERVICE_UNAVAILABLE, exchange);
     }

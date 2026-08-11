@@ -34,15 +34,19 @@ final class ExchangeFunctionStub {
      * tests override it with a second {@code stubResponse} call, which would otherwise trip
      * Mockito's strict-stubbing check on the unused default.
      */
-    static void stubResponse(final ExchangeFunction exchangeFunction, final HttpStatus status) {
+    static void stubResponse(final ExchangeFunction exchangeFunction,
+            final HttpStatus status) {
         lenient().when(exchangeFunction.exchange(any())).thenReturn(Mono.just(ClientResponse.create(status).build()));
     }
 
-    static void stubResponse(final ExchangeFunction exchangeFunction, final HttpStatus status, final String body) {
+    static void stubResponse(final ExchangeFunction exchangeFunction,
+            final HttpStatus status,
+            final String body) {
         lenient().when(exchangeFunction.exchange(any())).thenReturn(Mono.just(ClientResponse.create(status).body(body).build()));
     }
 
-    static void assertPostedTo(final ExchangeFunction exchangeFunction, final String expectedPath) {
+    static void assertPostedTo(final ExchangeFunction exchangeFunction,
+            final String expectedPath) {
         final ArgumentCaptor<ClientRequest> requestCaptor = ArgumentCaptor.forClass(ClientRequest.class);
         verify(exchangeFunction).exchange(requestCaptor.capture());
         assertThat(requestCaptor.getValue().method()).isEqualTo(HttpMethod.POST);

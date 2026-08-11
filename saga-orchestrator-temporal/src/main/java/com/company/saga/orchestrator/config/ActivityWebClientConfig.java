@@ -27,17 +27,20 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class ActivityWebClientConfig {
 
     @Bean
-    public WebClient orderWebClient(final WebClient.Builder webClientBuilder, final ServicesProperties servicesProperties) {
+    public WebClient orderWebClient(final WebClient.Builder webClientBuilder,
+            final ServicesProperties servicesProperties) {
         return webClientBuilder.baseUrl(servicesProperties.order().baseUrl()).build();
     }
 
     @Bean
-    public WebClient inventoryWebClient(final WebClient.Builder webClientBuilder, final ServicesProperties servicesProperties) {
+    public WebClient inventoryWebClient(final WebClient.Builder webClientBuilder,
+            final ServicesProperties servicesProperties) {
         return webClientBuilder.baseUrl(servicesProperties.inventory().baseUrl()).build();
     }
 
     @Bean
-    public WebClient paymentWebClient(final WebClient.Builder webClientBuilder, final ServicesProperties servicesProperties) {
+    public WebClient paymentWebClient(final WebClient.Builder webClientBuilder,
+            final ServicesProperties servicesProperties) {
         return webClientBuilder.baseUrl(servicesProperties.payment().baseUrl()).build();
     }
 }

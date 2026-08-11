@@ -7,7 +7,8 @@ public final class PermanentSagaException extends SagaException {
         super(ErrorType.PERMANENT, message);
     }
 
-    public PermanentSagaException(final String message, final Throwable cause) {
+    public PermanentSagaException(final String message,
+            final Throwable cause) {
         super(ErrorType.PERMANENT, message, cause);
     }
 }

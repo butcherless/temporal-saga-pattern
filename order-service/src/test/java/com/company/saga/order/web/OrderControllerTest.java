@@ -156,7 +156,9 @@ class OrderControllerTest {
      * for the two {@code SagaException} classifications): status code, {@code application/problem+json}
      * content type, and the {@code $.status}/{@code $.detail} body fields.
      */
-    private static void assertProblemDetail(final ResponseSpec response, final int expectedStatus, final String expectedDetail) {
+    private static void assertProblemDetail(final ResponseSpec response,
+            final int expectedStatus,
+            final String expectedDetail) {
         response.expectStatus().isEqualTo(expectedStatus)
                 .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .expectBody()

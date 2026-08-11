@@ -103,7 +103,8 @@ public class InventoryProgressionService {
                         InventoryReservation.reserve(request.sagaId(), request.sku(), request.quantity(), request.now())));
     }
 
-    private Mono<InventoryReservation> creditStockAndRelease(final InventoryReservation reservation, final Instant now) {
+    private Mono<InventoryReservation> creditStockAndRelease(final InventoryReservation reservation,
+            final Instant now) {
         final InventoryReservation released = reservation.release(now);
         return loadStockItem(reservation.sku())
                 .map(stockItem -> stockItem.release(reservation.quantity()))
@@ -117,7 +118,8 @@ public class InventoryProgressionService {
      * {@code reserveStock} call finds the already-persisted reservation via {@code findById} and
      * returns it directly, without ever reaching this method again).
      */
-    private Mono<InventoryReservation> simulateReserveFault(final String sku, final InventoryReservation reservation) {
+    private Mono<InventoryReservation> simulateReserveFault(final String sku,
+            final InventoryReservation reservation) {
         return switch (sku) {
             case FLAKY_RESERVE_SKU ->
                     Mono.error(new TemporarySagaException("Simulated inventory gateway timeout for sku %s".formatted(sku)));

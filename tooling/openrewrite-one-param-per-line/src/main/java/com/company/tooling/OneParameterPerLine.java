@@ -7,9 +7,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
-
-import java.util.List;
 
 public class OneParameterPerLine extends Recipe {
 
@@ -22,10 +19,11 @@ public class OneParameterPerLine extends Recipe {
 
     @Override
     public String getDescription() {
-        return "For method and constructor declarations with two or more parameters, puts every " +
-                "parameter after the first on its own line, indented one continuation level past the " +
-                "declaration. Declarations with zero or one parameter, method bodies, comments, and " +
-                "everything else are left untouched.";
+        return """
+                For method and constructor declarations with two or more parameters, puts every \
+                parameter after the first on its own line, indented one continuation level past the \
+                declaration. Declarations with zero or one parameter, method bodies, comments, and \
+                everything else are left untouched.""";
     }
 
     @Override
@@ -33,33 +31,30 @@ public class OneParameterPerLine extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-
-                List<Statement> parameters = m.getParameters();
+            public J.MethodDeclaration visitMethodDeclaration(final J.MethodDeclaration method, final ExecutionContext ctx) {
+                final var m = super.visitMethodDeclaration(method, ctx);
+                final var parameters = m.getParameters();
                 if (parameters.size() < 2) {
                     return m;
                 }
 
-                Space onOwnLine = Space.format("\n" + indentationOf(m.getPrefix()) + CONTINUATION_INDENT);
-                boolean[] changed = {false};
+                final var onOwnLine = Space.format("\n" + indentationOf(m.getPrefix()) + CONTINUATION_INDENT);
+                // ListUtils.map returns the same list reference untouched when every mapped
+                // element is reference-equal to its input, so this stays a pure, allocation-free
+                // no-op whenever the method is already formatted.
+                final var reformatted = ListUtils.map(parameters, (index, parameter) ->
+                        index == 0
+                                || !parameter.getPrefix().getComments().isEmpty()
+                                || parameter.getPrefix().equals(onOwnLine)
+                                ? parameter
+                                : parameter.withPrefix(onOwnLine));
 
-                List<Statement> reformatted = ListUtils.map(parameters, (index, parameter) -> {
-                    if (index == 0
-                            || !parameter.getPrefix().getComments().isEmpty()
-                            || parameter.getPrefix().equals(onOwnLine)) {
-                        return parameter;
-                    }
-                    changed[0] = true;
-                    return parameter.withPrefix(onOwnLine);
-                });
-
-                return changed[0] ? m.withParameters(reformatted) : m;
+                return reformatted == parameters ? m : m.withParameters(reformatted);
             }
 
-            private String indentationOf(Space prefix) {
-                String whitespace = prefix.getWhitespace();
-                int lastNewline = whitespace.lastIndexOf('\n');
+            private String indentationOf(final Space prefix) {
+                final var whitespace = prefix.getWhitespace();
+                final var lastNewline = whitespace.lastIndexOf('\n');
                 return lastNewline < 0 ? "" : whitespace.substring(lastNewline + 1);
             }
         };

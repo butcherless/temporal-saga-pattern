@@ -30,7 +30,7 @@ class OrderProgressionServiceTest {
     private static final Instant NOW = OrderTestClock.FIXED_INSTANT;
     private static final String BUSINESS_KEY = "ORDER-2026-000001";
     private static final String CONFIRMATION_FAILURE_BUSINESS_KEY =
-            "ORDER-2026-" + OrderProgressionService.PERMANENT_CONFIRMATION_FAILURE_MARKER;
+            "ORDER-2026-%s".formatted(OrderProgressionService.PERMANENT_CONFIRMATION_FAILURE_MARKER);
 
     @Mock
     private OrderRepository orderRepository;

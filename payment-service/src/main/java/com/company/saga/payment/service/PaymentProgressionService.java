@@ -78,11 +78,11 @@ public class PaymentProgressionService {
         final BigDecimal amount = candidate.amount();
         if (amount.compareTo(HARD_DECLINE_THRESHOLD) >= 0) {
             return paymentRepository.save(candidate.fail(now))
-                    .then(Mono.error(new PermanentSagaException("Payment declined for amount " + amount)));
+                    .then(Mono.error(new PermanentSagaException("Payment declined for amount %s".formatted(amount))));
         }
         if (amount.compareTo(FLAKY_THRESHOLD) >= 0 && candidate.attempt() == 1) {
             return paymentRepository.save(candidate)
-                    .then(Mono.error(new TemporarySagaException("Payment gateway timeout for amount " + amount)));
+                    .then(Mono.error(new TemporarySagaException("Payment gateway timeout for amount %s".formatted(amount))));
         }
         return paymentRepository.save(candidate.complete(now));
     }
@@ -90,12 +90,12 @@ public class PaymentProgressionService {
     /** PoC fault injection for §17.3 scenario 8: always throws before persisting a refund for {@link #PERMANENT_REFUND_FAILURE_AMOUNT}. */
     private Mono<Void> simulateRefundFault(final Payment payment) {
         return payment.amount().compareTo(PERMANENT_REFUND_FAILURE_AMOUNT) == 0
-                ? Mono.error(new PermanentSagaException("Simulated unrecoverable refund failure for amount " + payment.amount()))
+                ? Mono.error(new PermanentSagaException("Simulated unrecoverable refund failure for amount %s".formatted(payment.amount())))
                 : Mono.empty();
     }
 
     private Mono<Payment> loadPayment(final UUID sagaId) {
         return paymentRepository.findById(sagaId)
-                .switchIfEmpty(Mono.error(() -> new IllegalStateException("Payment not found: " + sagaId)));
+                .switchIfEmpty(Mono.error(() -> new IllegalStateException("Payment not found: %s".formatted(sagaId))));
     }
 }

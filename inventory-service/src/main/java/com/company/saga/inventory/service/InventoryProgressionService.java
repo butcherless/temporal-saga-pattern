@@ -119,7 +119,8 @@ public class InventoryProgressionService {
      */
     private Mono<InventoryReservation> simulateReserveFault(final String sku, final InventoryReservation reservation) {
         return switch (sku) {
-            case FLAKY_RESERVE_SKU -> Mono.error(new TemporarySagaException("Simulated inventory gateway timeout for sku " + sku));
+            case FLAKY_RESERVE_SKU ->
+                    Mono.error(new TemporarySagaException("Simulated inventory gateway timeout for sku %s".formatted(sku)));
             default -> Mono.just(reservation);
         };
     }
@@ -128,18 +129,18 @@ public class InventoryProgressionService {
     private Mono<Void> simulateReleaseFault(final InventoryReservation reservation) {
         return switch (reservation.sku()) {
             case PERMANENT_RELEASE_FAILURE_SKU ->
-                    Mono.error(new PermanentSagaException("Simulated unrecoverable release failure for sku " + reservation.sku()));
+                    Mono.error(new PermanentSagaException("Simulated unrecoverable release failure for sku %s".formatted(reservation.sku())));
             default -> Mono.empty();
         };
     }
 
     private Mono<InventoryReservation> loadReservation(final UUID sagaId) {
         return inventoryReservationRepository.findById(sagaId)
-                .switchIfEmpty(Mono.error(() -> new IllegalStateException("Reservation not found: " + sagaId)));
+                .switchIfEmpty(Mono.error(() -> new IllegalStateException("Reservation not found: %s".formatted(sagaId))));
     }
 
     private Mono<StockItem> loadStockItem(final String sku) {
         return stockItemRepository.findById(sku)
-                .switchIfEmpty(Mono.error(() -> new IllegalStateException("Stock item not found: " + sku)));
+                .switchIfEmpty(Mono.error(() -> new IllegalStateException("Stock item not found: %s".formatted(sku))));
     }
 }

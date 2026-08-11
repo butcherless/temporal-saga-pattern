@@ -81,12 +81,13 @@ public class OrderProgressionService {
      */
     private Mono<Void> simulateConfirmFault(final CustomerOrder order) {
         return order.businessKey().contains(PERMANENT_CONFIRMATION_FAILURE_MARKER)
-                ? Mono.error(new PermanentSagaException("Simulated unrecoverable order confirmation failure for businessKey " + order.businessKey()))
+                ? Mono.error(new PermanentSagaException(
+                "Simulated unrecoverable order confirmation failure for businessKey %s".formatted(order.businessKey())))
                 : Mono.empty();
     }
 
     private Mono<CustomerOrder> loadOrder(final UUID sagaId) {
         return orderRepository.findById(sagaId)
-                .switchIfEmpty(Mono.error(() -> new IllegalStateException("Order not found: " + sagaId)));
+                .switchIfEmpty(Mono.error(() -> new IllegalStateException("Order not found: %s".formatted(sagaId))));
     }
 }

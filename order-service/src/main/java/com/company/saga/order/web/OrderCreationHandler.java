@@ -7,6 +7,7 @@ import com.company.saga.order.domain.CustomerOrder;
 import com.company.saga.order.service.CreateOrderRequest;
 import com.company.saga.order.service.OrderProgressionService;
 import io.temporal.client.WorkflowClient;
+import io.temporal.client.WorkflowExecutionAlreadyStarted;
 import io.temporal.client.WorkflowOptions;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
@@ -41,11 +42,23 @@ public class OrderCreationHandler {
         final Instant now = Instant.now();
 
         return orderProgressionService.createOrder(new CreateOrderRequest(sagaId, businessKey, now))
-                .flatMap(order -> startSaga(order, request)
+                .flatMap(order -> startSagaIfNewlyCreated(order, sagaId, request)
                         .thenReturn(new CreateOrderResponseBody(order.id(), order.businessKey())));
     }
 
-    private Mono<Void> startSaga(final CustomerOrder order, final CreateOrderRequestBody request) {
+    /**
+     * Starts the saga only for the call that actually created the order: {@code order.id()}
+     * differs from the freshly-minted {@code sagaId} whenever {@code orderProgressionService}
+     * returned an already-existing row instead (idempotent by businessKey, proposal §17.3's
+     * duplicate-submission scenario). {@link WorkflowExecutionAlreadyStarted} is swallowed as a
+     * defense against the narrow race where two concurrent duplicate requests both observe no
+     * existing order — either way, the caller sees the same successful, idempotent outcome.
+     */
+    private Mono<Void> startSagaIfNewlyCreated(final CustomerOrder order, final UUID sagaId, final CreateOrderRequestBody request) {
+        if (!order.id().equals(sagaId)) {
+            return Mono.empty();
+        }
+
         final OrderSagaWorkflow workflow = workflowClient.newWorkflowStub(
                 OrderSagaWorkflow.class,
                 WorkflowOptions.newBuilder()
@@ -57,6 +70,7 @@ public class OrderCreationHandler {
         // WorkflowClient.start is a blocking gRPC call; run it off the WebFlux event loop.
         return Mono.fromRunnable(() -> WorkflowClient.start(workflow::process, input))
                 .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(WorkflowExecutionAlreadyStarted.class, error -> Mono.empty())
                 .then();
     }
 }

@@ -1,5 +1,6 @@
 package com.company.saga.order.web;
 
+import com.company.saga.common.error.TemporarySagaException;
 import com.company.saga.common.workflow.OrderSagaProgress;
 import com.company.saga.common.workflow.OrderSagaWorkflow;
 import com.company.saga.order.domain.CustomerOrder;
@@ -52,6 +53,13 @@ public class OrderQueryHandler {
         // same as OrderCreationHandler's own blocking WorkflowClient.start bridge.
         return Mono.fromCallable(workflow::getProgress)
                 .subscribeOn(blockingCallScheduler)
-                .map(progress -> new OrderStatusResponseBody(order.id(), order.status(), progress));
+                .map(progress -> new OrderStatusResponseBody(order.id(), order.status(), progress))
+                // The order is still PENDING, so the Workflow Execution should exist and be
+                // queryable; a failure here (not found, gRPC timeout, ...) is a transient
+                // condition from the caller's point of view, not a permanent one — mapped to 503
+                // by RestExceptionHandler's existing TemporarySagaException handling, same as
+                // every other gateway-style failure in this repo.
+                .onErrorMap(error -> new TemporarySagaException(
+                        "Saga progress temporarily unavailable for sagaId %s".formatted(order.id()), error));
     }
 }

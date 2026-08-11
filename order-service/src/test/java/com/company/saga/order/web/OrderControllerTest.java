@@ -196,6 +196,22 @@ class OrderControllerTest {
     }
 
     /**
+     * {@code OrderQueryHandler} wraps a failed live Workflow query as {@link TemporarySagaException}
+     * (see its own javadoc) — this proves that mapping actually reaches the caller as a 503, the
+     * same {@code RestExceptionHandler} path already covered for {@code confirmOrder}.
+     */
+    @Test
+    void getOrderStatusReturns503WhenTheWorkflowQueryFails() {
+        final UUID sagaId = UUID.randomUUID();
+        when(orderQueryHandler.getOrderStatus(sagaId))
+                .thenReturn(Mono.error(new TemporarySagaException("Saga progress temporarily unavailable for sagaId %s".formatted(sagaId))));
+
+        final ResponseSpec response = client.get().uri("/orders/{sagaId}", sagaId).exchange();
+
+        assertProblemDetail(response, 503, "Saga progress temporarily unavailable for sagaId %s".formatted(sagaId));
+    }
+
+    /**
      * Shared shape behind every {@code ProblemDetail} assertion above (400 for bad input, 404 for
      * an unknown sagaId, 422/503 for the two {@code SagaException} classifications): status code,
      * {@code application/problem+json} content type, and the {@code $.status}/{@code $.detail} body fields.

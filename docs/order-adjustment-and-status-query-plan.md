@@ -192,11 +192,15 @@ public class OrderQueryHandler {
         final OrderSagaWorkflow workflow = workflowClient.newWorkflowStub(OrderSagaWorkflow.class, order.businessKey());
         return Mono.fromCallable(workflow::getProgress)
                 .subscribeOn(blockingCallScheduler)
-                .map(progress -> new OrderStatusResponseBody(order.id(), order.status(), progress));
+                .map(progress -> new OrderStatusResponseBody(order.id(), order.status(), progress))
+                .onErrorMap(error -> new TemporarySagaException(
+                        "Saga progress temporarily unavailable for sagaId %s".formatted(order.id()), error));
     }
 }
 ```
 Deliberately queries Temporal **only** while the order is still `PENDING` — once `CustomerOrder.status` is terminal, the outcome is derived from the durable DB row alone, without depending on the Workflow Execution still being open/queryable in Temporal's retention window. This reuses `blockingCallScheduler`, the same virtual-thread executor bean `OrderCreationHandler` already uses for its own blocking Temporal call (`OrderWebConfig.java:35-38`) — no new bean needed, just an added constructor parameter on the config method.
+
+A failed query (Workflow Execution not found, gRPC timeout, ...) is wrapped as `TemporarySagaException` rather than left to propagate raw: the order is still `PENDING`, so the execution is expected to exist and be reachable, and a failure to reach it is a transient condition from the caller's point of view — `RestExceptionHandler`'s existing `TemporarySagaException` → 503 mapping (already in place for `confirmOrder`) handles it with no new exception-handler code needed.
 
 `web/OrderStatusResponseBody.java` (new record, same `@Schema`-annotated shape as `ConfirmOrderResponseBody`/`CancelOrderResponseBody`): `(UUID sagaId, OrderStatus orderStatus, OrderSagaProgress sagaProgress)`.
 

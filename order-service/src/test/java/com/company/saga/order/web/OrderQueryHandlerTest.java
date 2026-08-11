@@ -1,5 +1,6 @@
 package com.company.saga.order.web;
 
+import com.company.saga.common.error.TemporarySagaException;
 import com.company.saga.common.workflow.OrderSagaInput;
 import com.company.saga.common.workflow.OrderSagaProgress;
 import com.company.saga.common.workflow.OrderSagaWorkflow;
@@ -117,6 +118,37 @@ class OrderQueryHandlerTest {
                     assertThat(response.sagaProgress()).isEqualTo(OrderSagaProgress.PAYMENT_REQUESTED);
                 })
                 .verifyComplete();
+    }
+
+    /**
+     * The order is still PENDING, so the Workflow Execution is expected to exist and be
+     * queryable — a failure reaching it (not found, gRPC timeout, ...) is treated as transient
+     * from the caller's point of view, wrapped as {@link TemporarySagaException} so
+     * {@code RestExceptionHandler}'s existing mapping turns it into a 503 rather than an
+     * unshaped 500.
+     */
+    @Test
+    void getOrderStatusWrapsAWorkflowQueryFailureAsATemporarySagaException() {
+        final UUID sagaId = UUID.randomUUID();
+        final String businessKey = "ORDER-2026-900004";
+        final CustomerOrder pending = CustomerOrder.create(sagaId, businessKey, Instant.now());
+        when(orderProgressionService.getOrder(sagaId)).thenReturn(Mono.just(pending));
+
+        final OrderSagaWorkflow failingWorkflow = mock(OrderSagaWorkflow.class);
+        final RuntimeException queryFailure = new RuntimeException("Simulated Temporal query failure");
+        when(failingWorkflow.getProgress()).thenThrow(queryFailure);
+
+        final WorkflowClient mockWorkflowClient = mock(WorkflowClient.class);
+        when(mockWorkflowClient.newWorkflowStub(OrderSagaWorkflow.class, businessKey)).thenReturn(failingWorkflow);
+
+        final OrderQueryHandler handler = new OrderQueryHandler(orderProgressionService, mockWorkflowClient, Schedulers.immediate());
+
+        StepVerifier.create(handler.getOrderStatus(sagaId))
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(TemporarySagaException.class);
+                    assertThat(error.getCause()).isSameAs(queryFailure);
+                })
+                .verify();
     }
 
     @Test

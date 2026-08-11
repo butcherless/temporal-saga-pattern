@@ -2,6 +2,7 @@ package com.company.saga.payment.web;
 
 import com.company.saga.common.error.PermanentSagaException;
 import com.company.saga.common.error.TemporarySagaException;
+import com.company.saga.payment.domain.PartialRefund;
 import com.company.saga.payment.domain.Payment;
 import com.company.saga.payment.domain.PaymentStatus;
 import com.company.saga.payment.service.PaymentProgressionService;
@@ -119,6 +120,34 @@ class PaymentControllerTest {
         final ResponseSpec response = client.post().uri("/payments/{sagaId}/refund", sagaId).exchange();
 
         assertProblemDetail(response, 422, "Simulated unrecoverable refund failure for amount 750.00");
+    }
+
+    @Test
+    void issuePartialRefundReturns201WithTheRefund() {
+        final UUID sagaId = UUID.randomUUID();
+        final PartialRefund refund = new PartialRefund(sagaId, sagaId, new java.math.BigDecimal("20.00"), Instant.now(), null);
+        when(paymentProgressionService.issuePartialRefund(any())).thenReturn(Mono.just(refund));
+
+        client.post().uri("/payments/partial-refunds")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"sagaId":"%s","amount":20.00}""".formatted(sagaId))
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.sagaId").isEqualTo(sagaId.toString())
+                .jsonPath("$.amount").isEqualTo(20.00);
+    }
+
+    @Test
+    void issuePartialRefundRejectsAnInvalidRequestBodyWithAProblemDetail() {
+        final ResponseSpec response = client.post().uri("/payments/partial-refunds")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"sagaId":"%s","amount":-1}""".formatted(UUID.randomUUID()))
+                .exchange();
+
+        assertProblemDetail(response, 400, "amount must be positive");
     }
 
     /**

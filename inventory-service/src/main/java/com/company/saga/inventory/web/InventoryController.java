@@ -1,6 +1,7 @@
 package com.company.saga.inventory.web;
 
 import com.company.saga.inventory.service.ConfirmReservationRequest;
+import com.company.saga.inventory.service.CreditStockRequest;
 import com.company.saga.inventory.service.InventoryProgressionService;
 import com.company.saga.inventory.service.ReleaseStockRequest;
 import com.company.saga.inventory.service.ReserveStockRequest;
@@ -77,5 +78,20 @@ public class InventoryController {
 
         return inventoryProgressionService.releaseStock(new ReleaseStockRequest(sagaId, Instant.now()))
                 .map(reservation -> ResponseEntity.ok(new ReservationResponseBody(reservation.id(), reservation.status())));
+    }
+
+    @PostMapping("/credit")
+    @Operation(
+            summary = "Credit stock",
+            description = "Credits stock back for a quantity-decrease order adjustment, without an existing reservation "
+                    + "(the original order's reservation may already be CONFIRMED, a terminal state with no reversal path).")
+    @ApiResponse(responseCode = "200", description = "Stock credited")
+    @ApiResponse(responseCode = "400", description = "Invalid request body (blank sku, non-positive quantity)",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    public Mono<ResponseEntity<Void>> creditStock(@RequestBody final CreditStockRequestBody request) {
+        log.debug("creditStock - {}", request);
+
+        return inventoryProgressionService.creditStock(new CreditStockRequest(request.sagaId(), request.sku(), request.quantity(), Instant.now()))
+                .thenReturn(ResponseEntity.ok().build());
     }
 }

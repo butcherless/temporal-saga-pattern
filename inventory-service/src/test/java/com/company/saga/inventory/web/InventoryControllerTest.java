@@ -151,6 +151,30 @@ class InventoryControllerTest {
         assertProblemDetail(response, 422, "Simulated unrecoverable release failure for sku SKU-INPUTDATA-6");
     }
 
+    @Test
+    void creditStockReturns200() {
+        final UUID sagaId = UUID.randomUUID();
+        when(inventoryProgressionService.creditStock(any())).thenReturn(Mono.empty());
+
+        client.post().uri("/inventory/reservations/credit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"sagaId":"%s","sku":"SKU-001","quantity":10}""".formatted(sagaId))
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    void creditStockRejectsAnInvalidRequestBodyWithAProblemDetail() {
+        final ResponseSpec response = client.post().uri("/inventory/reservations/credit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"sagaId":"%s","sku":"SKU-001","quantity":-1}""".formatted(UUID.randomUUID()))
+                .exchange();
+
+        assertProblemDetail(response, 400, "quantity must be positive");
+    }
+
     /**
      * Shared shape behind every {@code ProblemDetail} assertion above (400 for bad input, 422/503
      * for the two {@code SagaException} classifications): status code, {@code application/problem+json}

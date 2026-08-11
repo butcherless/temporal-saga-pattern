@@ -135,4 +135,4 @@ Scripted equivalent: `platform-test/scripts/stop-all.sh` (steps 1-3 below; uses 
 Not implemented in this repo yet — see `docs/temporal-saga-proposal.md` for the full picture:
 
 - A shared library between this repo and `saga-pattern-poc`, if the duplicated domain code turns out to be worth deduplicating once both implementations are further along.
-- Partial-quantity order adjustment (place a follow-up order referencing an already-completed one, charge/refund the delta) — design sketch only, not started; see `docs/order-adjustment-and-status-query-plan.md`'s Part A.
+- Partial-quantity order adjustment (place a follow-up order referencing an already-completed one, charge/refund the delta): the two standalone REST use cases it needs (`inventory-service`'s `creditStock`, `payment-service`'s `issuePartialRefund`) are implemented, but the adjustment saga/workflow that would call them together as one unit is not; see `docs/order-adjustment-and-status-query-plan.md`'s Part A.

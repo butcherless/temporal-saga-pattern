@@ -1,5 +1,6 @@
 package com.company.saga.payment.web;
 
+import com.company.saga.payment.service.IssuePartialRefundRequest;
 import com.company.saga.payment.service.PaymentProgressionService;
 import com.company.saga.payment.service.RefundPaymentRequest;
 import com.company.saga.payment.service.RequestPaymentRequest;
@@ -63,5 +64,20 @@ public class PaymentController {
 
         return paymentProgressionService.refundPayment(new RefundPaymentRequest(sagaId, Instant.now()))
                 .map(payment -> ResponseEntity.ok(new PaymentResponseBody(payment.id(), payment.status())));
+    }
+
+    @PostMapping("/partial-refunds")
+    @Operation(
+            summary = "Issue a partial refund",
+            description = "Refunds an amount for a quantity-decrease order adjustment, without a corresponding payment request. "
+                    + "Idempotent by sagaId (the adjustment's own, not the original order's).")
+    @ApiResponse(responseCode = "201", description = "Partial refund issued (or already was)")
+    @ApiResponse(responseCode = "400", description = "Invalid request body (non-positive amount)",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    public Mono<ResponseEntity<PartialRefundResponseBody>> issuePartialRefund(@RequestBody final IssuePartialRefundRequestBody request) {
+        log.debug("issuePartialRefund - {}", request);
+
+        return paymentProgressionService.issuePartialRefund(new IssuePartialRefundRequest(request.sagaId(), request.amount(), Instant.now()))
+                .map(refund -> ResponseEntity.status(HttpStatus.CREATED).body(new PartialRefundResponseBody(refund.id(), refund.amount())));
     }
 }

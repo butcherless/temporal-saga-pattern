@@ -214,4 +214,26 @@ class InventoryProgressionServiceTest {
                 .expectError(IllegalStateException.class)
                 .verify();
     }
+
+    @Test
+    void creditStockCreditsTheStockCounterWithoutTouchingAnyReservation() {
+        final UUID sagaId = UUID.randomUUID();
+        when(stockItemRepository.findById(SKU)).thenReturn(Mono.just(new StockItem(SKU, 90, 0L)));
+
+        StepVerifier.create(service.creditStock(new CreditStockRequest(sagaId, SKU, 10, NOW)))
+                .verifyComplete();
+
+        verify(stockItemRepository).save(new StockItem(SKU, 100, 0L));
+        verify(inventoryReservationRepository, never()).findById(any(UUID.class));
+        verify(inventoryReservationRepository, never()).save(any());
+    }
+
+    @Test
+    void creditStockFailsWhenStockItemNotFound() {
+        when(stockItemRepository.findById("SKU-999")).thenReturn(Mono.empty());
+
+        StepVerifier.create(service.creditStock(new CreditStockRequest(UUID.randomUUID(), "SKU-999", 10, NOW)))
+                .expectError(IllegalStateException.class)
+                .verify();
+    }
 }

@@ -3,8 +3,10 @@ package com.company.saga.payment.service;
 import com.company.saga.common.error.PermanentSagaException;
 import com.company.saga.common.error.TemporarySagaException;
 import com.company.saga.payment.domain.IllegalPaymentTransitionException;
+import com.company.saga.payment.domain.PartialRefund;
 import com.company.saga.payment.domain.Payment;
 import com.company.saga.payment.domain.PaymentStatus;
+import com.company.saga.payment.persistence.PartialRefundRepository;
 import com.company.saga.payment.persistence.PaymentRepository;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
@@ -35,9 +37,12 @@ public class PaymentProgressionService {
     public static final BigDecimal PERMANENT_REFUND_FAILURE_AMOUNT = new BigDecimal("750.00");
 
     private final PaymentRepository paymentRepository;
+    private final PartialRefundRepository partialRefundRepository;
 
-    public PaymentProgressionService(final PaymentRepository paymentRepository) {
+    public PaymentProgressionService(final PaymentRepository paymentRepository,
+            final PartialRefundRepository partialRefundRepository) {
         this.paymentRepository = Objects.requireNonNull(paymentRepository, "paymentRepository must not be null");
+        this.partialRefundRepository = Objects.requireNonNull(partialRefundRepository, "partialRefundRepository must not be null");
     }
 
     /**
@@ -72,6 +77,20 @@ public class PaymentProgressionService {
                         ? Mono.just(payment)
                         : simulateRefundFault(payment)
                                 .then(Mono.defer(() -> paymentRepository.save(payment.refund(request.now())))));
+    }
+
+    /**
+     * Issues a standalone refund for {@code request.sagaId()} (an order adjustment's own saga id,
+     * not necessarily tied to any {@link Payment} row), or returns the existing one if already
+     * issued. Backs a quantity-decrease order adjustment
+     * (docs/order-adjustment-and-status-query-plan.md, Part A): unlike {@link #refundPayment},
+     * this doesn't require — or touch — a pre-existing {@code Payment}.
+     */
+    public Mono<PartialRefund> issuePartialRefund(final IssuePartialRefundRequest request) {
+        log.debug("issuePartialRefund - {}", request);
+        return partialRefundRepository.findById(request.sagaId())
+                .switchIfEmpty(Mono.defer(() -> partialRefundRepository.save(
+                        new PartialRefund(request.sagaId(), request.sagaId(), request.amount(), request.now(), null))));
     }
 
     private Mono<Payment> evaluate(final Payment candidate,

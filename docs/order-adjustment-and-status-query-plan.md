@@ -1,6 +1,6 @@
 # Two design sketches: partial-quantity order adjustment ops, and a live saga status query
 
-> Status: **Part A (partial-quantity adjustment) is a draft sketch, not started. Part B (`GET /orders/{sagaId}` status query) is implemented** — see `saga-common`'s `OrderSagaProgress`/`OrderSagaWorkflow.getProgress()`, `saga-orchestrator-temporal`'s `OrderSagaWorkflowImpl`, and `order-service`'s `OrderQueryHandler`/`OrderController`. Covered by `OrderQueryHandlerTest`, `OrderControllerTest`, `OrderSagaWorkflowImplTest`, and `platform-test/scripts/e2e-order-status-query.sh` (all passing).
+> Status: **Both parts are implemented.** Part A (partial-quantity adjustment): `inventory-service`'s `InventoryProgressionService.creditStock`/`InventoryController` and `payment-service`'s `PaymentProgressionService.issuePartialRefund`/`PaymentController` — the adjustment saga/workflow that would call the two together is still out of scope (see its own note below). Covered by `CreditStockRequestTest`, `InventoryProgressionServiceTest`, `InventoryControllerTest`, `IssuePartialRefundRequestTest`, `PaymentProgressionServiceTest`, `PaymentControllerTest`, and `platform-test/scripts/e2e-order-adjustment.sh` (all passing). Part B (`GET /orders/{sagaId}` status query): `saga-common`'s `OrderSagaProgress`/`OrderSagaWorkflow.getProgress()`, `saga-orchestrator-temporal`'s `OrderSagaWorkflowImpl`, and `order-service`'s `OrderQueryHandler`/`OrderController`. Covered by `OrderQueryHandlerTest`, `OrderControllerTest`, `OrderSagaWorkflowImplTest`, `OrderNotFoundExceptionTest`, and `platform-test/scripts/e2e-order-status-query.sh` (all passing).
 
 This plan covers two independent, unrelated additions. They touch different modules and can be implemented separately.
 
@@ -49,7 +49,7 @@ Credits stock back to the shared `StockItem` counter for an arbitrary quantity, 
 
 Refunds an arbitrary amount without requiring a pre-existing `Payment` row for the sagaId in use.
 
-- **Domain**: `Payment` is unsuitable to reuse directly — its constructor requires a full lifecycle (`request` → `complete` → `refund`) and its `refund()` always refunds the *entire* stored `amount`. Introduce a **separate, minimal aggregate** rather than distorting `Payment`: `PartialRefund` record — `(UUID id, UUID relatedSagaId, BigDecimal amount, Instant createdAt)`, table `partial_refund`, `@Id id` = the adjustment's own `sagaId` (same "id is the saga's id" convention as `Payment`/`InventoryReservation`). No status enum needed — a partial refund is a single fire-and-forget event, not a stateful transition (unlike `Payment`, nothing later reverses a refund). Needs its own Flyway migration (append-only, per repo convention) adding `partial_refund(id UUID PRIMARY KEY, related_saga_id UUID NOT NULL, amount NUMERIC NOT NULL, created_at TIMESTAMPTZ NOT NULL)`.
+- **Domain**: `Payment` is unsuitable to reuse directly — its constructor requires a full lifecycle (`request` → `complete` → `refund`) and its `refund()` always refunds the *entire* stored `amount`. Introduce a **separate, minimal aggregate** rather than distorting `Payment`: `PartialRefund` record — `(UUID id, UUID relatedSagaId, BigDecimal amount, Instant createdAt, Long version)`, table `partial_refund`, `@Id id` = the adjustment's own `sagaId` (same "id is the saga's id" convention as `Payment`/`InventoryReservation`). No status enum needed — a partial refund is a single fire-and-forget event, not a stateful transition (unlike `Payment`, nothing later reverses a refund). The `@Version version` field (always `null` on creation) is required despite there being nothing to optimistically lock: without it, Spring Data R2DBC's `save()` sees the always-non-null, manually-assigned `id` and assumes the row already exists, issuing a silent no-op `UPDATE` instead of an `INSERT` — caught by `platform-test/scripts/e2e-order-adjustment.sh` (a unit test with a fully-mocked repository can't catch this; it needs a real database). Needs its own Flyway migration (append-only once released, per repo convention) adding `partial_refund(id UUID PRIMARY KEY, related_saga_id UUID NOT NULL, amount NUMERIC NOT NULL, created_at TIMESTAMP NOT NULL, version BIGINT NOT NULL DEFAULT 0)`.
 - **`persistence/PartialRefundRepository.java`** (new, mirrors `PaymentRepository.java:9`): `interface PartialRefundRepository extends ReactiveCrudRepository<PartialRefund, UUID>`.
 - **`service/IssuePartialRefundRequest.java`** (new record, mirrors `RequestPaymentRequest.java:9-21`): `(UUID sagaId, BigDecimal amount, Instant now)`, same `amount.signum() <= 0` validation.
 - **`PaymentProgressionService.issuePartialRefund(IssuePartialRefundRequest request)`** (new method):
@@ -58,7 +58,7 @@ Refunds an arbitrary amount without requiring a pre-existing `Payment` row for t
       log.debug("issuePartialRefund - {}", request);
       return partialRefundRepository.findById(request.sagaId())
               .switchIfEmpty(Mono.defer(() -> partialRefundRepository.save(
-                      new PartialRefund(request.sagaId(), request.sagaId(), request.amount(), request.now()))));
+                      new PartialRefund(request.sagaId(), request.sagaId(), request.amount(), request.now(), null))));
   }
   ```
   `findById`-then-`switchIfEmpty` gives idempotency-by-`sagaId` for free, matching every other use case in this repo (`requestPayment`, `reserveStock`, `createOrder`). `relatedSagaId` in the sketch above just equals the adjustment's own `sagaId` for now — if the plan later needs to link back to the *original* order's sagaId (for traceability/auditing), thread that through as a separate field on `IssuePartialRefundRequest` once the adjustment workflow's input shape is designed; not needed for this sketch.
@@ -79,10 +79,11 @@ Refunds an arbitrary amount without requiring a pre-existing `Payment` row for t
 
 ### Verification (Part A)
 
-- Unit tests for `InventoryProgressionService.creditStock` and `PaymentProgressionService.issuePartialRefund`, following the existing test style in `InventoryProgressionServiceTest`/`PaymentProgressionServiceTest` (in-memory/mocked repositories).
-- `InventoryControllerTest`/`PaymentControllerTest`: add WebTestClient cases for the two new endpoints (happy path + validation-failure 400s), mirroring existing test structure.
-- New Flyway migration for `partial_refund` picked up automatically by `payment-service`'s existing Testcontainers-Postgres IT setup — run `./mvnw verify -pl payment-service` to confirm it applies cleanly.
-- No end-to-end/workflow test yet, since the adjustment saga/workflow that calls these two endpoints is out of scope for this sketch.
+- Unit tests for `InventoryProgressionService.creditStock` and `PaymentProgressionService.issuePartialRefund` (in-memory/mocked repositories), plus dedicated `CreditStockRequestTest`/`IssuePartialRefundRequestTest` for the two new service-layer request records, matching this repo's convention of one test class per `*Request` record (e.g. `ReserveStockRequestTest`, `RequestPaymentRequestTest`).
+- `InventoryControllerTest`/`PaymentControllerTest`: `WebTestClient` cases for the two new endpoints (happy path + validation-failure 400s).
+- The `partial_refund` Flyway migration (`V2__create_partial_refund.sql`) is picked up automatically by `payment-service`'s existing Testcontainers-Postgres IT setup.
+- **`platform-test/scripts/e2e-order-adjustment.sh`** (new, added to the existing `e2e-*.sh` collection): curl-based, against the real docker-compose stack. Calls `POST /inventory/reservations/credit` directly and asserts `stock_item.available_quantity` increases by exactly the credited quantity; calls `POST /payments/partial-refunds` and asserts a single `partial_refund` row is created, then re-issues the same request and asserts it's a no-op (idempotent by the adjustment's own `sagaId`, not a second row). Exercises the two endpoints directly rather than through a saga, since the adjustment workflow that would call them together doesn't exist yet.
+- No end-to-end/workflow test for a full adjustment saga, since that workflow itself is still out of scope for this sketch (see the design note above).
 
 ---
 

@@ -95,6 +95,25 @@ public class InventoryProgressionService {
                                 .then(Mono.defer(() -> creditStockAndRelease(reservation, request.now()))));
     }
 
+    /**
+     * Credits {@code request.quantity()} units of {@code request.sku()} back to the stock counter,
+     * for a quantity-decrease order adjustment (docs/order-adjustment-and-status-query-plan.md,
+     * Part A) — deliberately bypassing {@link InventoryReservation} entirely: a decrease adjustment
+     * never reserved anything itself, and the original reservation's {@code CONFIRMED} state is a
+     * terminal PIVOT with no reversal path (see {@link ReservationStatus}'s own javadoc), so there
+     * is nothing to load or transition here. Unlike every other use case in this class, this has no
+     * idempotency guard — there is no row keyed by {@code request.sagaId()} to check against; the
+     * caller (the adjustment saga, once it exists) is responsible for not invoking this twice for
+     * the same adjustment.
+     */
+    public Mono<Void> creditStock(final CreditStockRequest request) {
+        log.debug("creditStock - {}", request);
+        return loadStockItem(request.sku())
+                .map(stockItem -> stockItem.release(request.quantity()))
+                .flatMap(stockItemRepository::save)
+                .then();
+    }
+
     private Mono<InventoryReservation> debitAndReserve(final ReserveStockRequest request) {
         return loadStockItem(request.sku())
                 .map(stockItem -> stockItem.reserve(request.quantity()))

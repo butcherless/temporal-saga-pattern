@@ -3,9 +3,11 @@ package com.company.saga.payment.service;
 import com.company.saga.common.error.PermanentSagaException;
 import com.company.saga.common.error.TemporarySagaException;
 import com.company.saga.payment.domain.IllegalPaymentTransitionException;
+import com.company.saga.payment.domain.PartialRefund;
 import com.company.saga.payment.domain.Payment;
 import com.company.saga.payment.domain.PaymentStatus;
 import com.company.saga.payment.domain.PaymentTestClock;
+import com.company.saga.payment.persistence.PartialRefundRepository;
 import com.company.saga.payment.persistence.PaymentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,12 +36,16 @@ class PaymentProgressionServiceTest {
     @Mock
     private PaymentRepository paymentRepository;
 
+    @Mock
+    private PartialRefundRepository partialRefundRepository;
+
     private PaymentProgressionService service;
 
     @BeforeEach
     void setUp() {
-        service = new PaymentProgressionService(paymentRepository);
+        service = new PaymentProgressionService(paymentRepository, partialRefundRepository);
         lenient().when(paymentRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        lenient().when(partialRefundRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
     }
 
     @Test
@@ -175,5 +181,35 @@ class PaymentProgressionServiceTest {
                 .verify();
 
         verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    void issuePartialRefundCreatesANewStandaloneRefund() {
+        final UUID sagaId = UUID.randomUUID();
+        when(partialRefundRepository.findById(sagaId)).thenReturn(Mono.empty());
+
+        StepVerifier.create(service.issuePartialRefund(new IssuePartialRefundRequest(sagaId, new BigDecimal("20.00"), NOW)))
+                .assertNext(refund -> {
+                    assertThat(refund.id()).isEqualTo(sagaId);
+                    assertThat(refund.relatedSagaId()).isEqualTo(sagaId);
+                    assertThat(refund.amount()).isEqualByComparingTo("20.00");
+                    assertThat(refund.createdAt()).isEqualTo(NOW);
+                })
+                .verifyComplete();
+
+        verify(paymentRepository, never()).findById(any(UUID.class));
+    }
+
+    @Test
+    void issuePartialRefundIsIdempotentAndReturnsTheExistingRefund() {
+        final UUID sagaId = UUID.randomUUID();
+        final PartialRefund existing = new PartialRefund(sagaId, sagaId, new BigDecimal("20.00"), NOW, 0L);
+        when(partialRefundRepository.findById(sagaId)).thenReturn(Mono.just(existing));
+
+        StepVerifier.create(service.issuePartialRefund(new IssuePartialRefundRequest(sagaId, new BigDecimal("20.00"), NOW)))
+                .assertNext(refund -> assertThat(refund).isEqualTo(existing))
+                .verifyComplete();
+
+        verify(partialRefundRepository, never()).save(any());
     }
 }

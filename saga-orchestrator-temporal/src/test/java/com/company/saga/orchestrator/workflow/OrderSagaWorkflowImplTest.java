@@ -6,8 +6,10 @@ import com.company.saga.common.workflow.OrderSagaWorkflow;
 import com.company.saga.orchestrator.activities.InventoryActivities;
 import com.company.saga.orchestrator.activities.OrderActivities;
 import com.company.saga.orchestrator.activities.PaymentActivities;
+import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowFailedException;
 import io.temporal.client.WorkflowOptions;
+import io.temporal.client.WorkflowStub;
 import io.temporal.failure.ApplicationFailure;
 import io.temporal.testing.TestWorkflowEnvironment;
 import io.temporal.worker.Worker;
@@ -18,6 +20,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -158,6 +162,43 @@ class OrderSagaWorkflowImplTest {
         assertThat(workflow.getProgress()).isEqualTo(OrderSagaProgress.COMPENSATED);
     }
 
+    /**
+     * The other tests only ever assert {@code getProgress()} once the Workflow Execution has
+     * already reached a terminal state ({@code COMPLETED}/{@code COMPENSATED}) — none of them
+     * prove the field actually holds an intermediate value while a later step is still in flight,
+     * which is the entire point of {@code GET /orders/{sagaId}} polling a {@code PENDING} order.
+     * This pauses inside the {@code requestPayment} Activity (a real thread block via
+     * {@link CountDownLatch} — safe here since Activities run on real threads, unlike the
+     * deterministic Workflow coroutine) and queries the Workflow while it's genuinely still
+     * executing, before releasing it to completion.
+     */
+    @Test
+    void getProgressReflectsInventoryReservedWhilePaymentActivityIsStillInFlight() throws InterruptedException {
+        final UUID sagaId = UUID.randomUUID();
+        final OrderSagaInput input = new OrderSagaInput(sagaId, "ORDER-2026-800006", "SKU-001", 5, new BigDecimal("49.99"));
+
+        final CountDownLatch requestPaymentStarted = new CountDownLatch(1);
+        final CountDownLatch releaseRequestPayment = new CountDownLatch(1);
+        final OrderSagaWorkflow workflow = newWorkflowStub(
+                input.businessKey(),
+                FakeActivities.builder(callLog).blockRequestPaymentUntilReleased(requestPaymentStarted, releaseRequestPayment).build());
+
+        WorkflowClient.start(workflow::process, input);
+        assertThat(requestPaymentStarted.await(10, TimeUnit.SECONDS)).isTrue();
+
+        assertThat(workflow.getProgress()).isEqualTo(OrderSagaProgress.INVENTORY_RESERVED);
+
+        releaseRequestPayment.countDown();
+        WorkflowStub.fromTyped(workflow).getResult(Void.class);
+
+        assertThat(workflow.getProgress()).isEqualTo(OrderSagaProgress.COMPLETED);
+        assertThat(callLog).containsExactly(
+                "reserveStock(%s,SKU-001,5)".formatted(sagaId),
+                "requestPayment(%s,49.99)".formatted(sagaId),
+                "confirmOrder(%s)".formatted(sagaId),
+                "confirmReservation(%s)".formatted(sagaId));
+    }
+
     private OrderSagaWorkflow newWorkflowStub(final String businessKey,
             final FakeActivities activities) {
         testEnv = TestWorkflowEnvironment.newInstance();
@@ -182,6 +223,8 @@ class OrderSagaWorkflowImplTest {
         private final boolean reserveStockFailsPermanently;
         private final boolean refundPaymentFailsPermanently;
         private final boolean confirmOrderFailsPermanently;
+        private final CountDownLatch requestPaymentStartedLatch;
+        private final CountDownLatch requestPaymentReleaseLatch;
         private final AtomicInteger reserveStockAttempts = new AtomicInteger();
 
         private FakeActivities(final Builder builder) {
@@ -190,6 +233,8 @@ class OrderSagaWorkflowImplTest {
             this.reserveStockFailsPermanently = builder.reserveStockFailsPermanently;
             this.refundPaymentFailsPermanently = builder.refundPaymentFailsPermanently;
             this.confirmOrderFailsPermanently = builder.confirmOrderFailsPermanently;
+            this.requestPaymentStartedLatch = builder.requestPaymentStartedLatch;
+            this.requestPaymentReleaseLatch = builder.requestPaymentReleaseLatch;
         }
 
         static Builder builder(final List<String> callLog) {
@@ -224,6 +269,10 @@ class OrderSagaWorkflowImplTest {
         public void requestPayment(final UUID sagaId,
                 final BigDecimal amount) {
             callLog.add("requestPayment(%s,%s)".formatted(sagaId, amount));
+            if (requestPaymentStartedLatch != null) {
+                requestPaymentStartedLatch.countDown();
+                awaitUninterruptibly(requestPaymentReleaseLatch);
+            }
         }
 
         @Override
@@ -247,12 +296,23 @@ class OrderSagaWorkflowImplTest {
             callLog.add("cancelOrder(%s)".formatted(sagaId));
         }
 
+        private static void awaitUninterruptibly(final CountDownLatch latch) {
+            try {
+                latch.await();
+            } catch (final InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+        }
+
         private static final class Builder {
             private final List<String> callLog;
             private boolean reserveStockFailsOnFirstAttempt;
             private boolean reserveStockFailsPermanently;
             private boolean refundPaymentFailsPermanently;
             private boolean confirmOrderFailsPermanently;
+            private CountDownLatch requestPaymentStartedLatch;
+            private CountDownLatch requestPaymentReleaseLatch;
 
             private Builder(final List<String> callLog) {
                 this.callLog = callLog;
@@ -275,6 +335,13 @@ class OrderSagaWorkflowImplTest {
 
             Builder failConfirmOrderPermanently() {
                 this.confirmOrderFailsPermanently = true;
+                return this;
+            }
+
+            Builder blockRequestPaymentUntilReleased(final CountDownLatch startedLatch,
+                    final CountDownLatch releaseLatch) {
+                this.requestPaymentStartedLatch = startedLatch;
+                this.requestPaymentReleaseLatch = releaseLatch;
                 return this;
             }
 

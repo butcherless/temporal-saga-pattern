@@ -36,7 +36,7 @@ class OrderStatusTest {
     @ParameterizedTest
     @EnumSource(OrderStatus.class)
     void isTerminalMatchesExpectedTerminalStates(final OrderStatus status) {
-        Set<OrderStatus> expectedTerminal = Set.of(CONFIRMED, CANCELLED);
+        final Set<OrderStatus> expectedTerminal = Set.of(CONFIRMED, CANCELLED);
 
         assertThat(status.isTerminal()).isEqualTo(expectedTerminal.contains(status));
     }

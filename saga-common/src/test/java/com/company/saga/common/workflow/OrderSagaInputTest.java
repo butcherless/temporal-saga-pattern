@@ -11,9 +11,9 @@ class OrderSagaInputTest {
 
     @Test
     void exposesAllComponentsPassedToTheConstructor() {
-        UUID sagaId = UUID.randomUUID();
+        final UUID sagaId = UUID.randomUUID();
 
-        OrderSagaInput input = new OrderSagaInput(sagaId, "biz-key-1", "SKU-1", 3, new BigDecimal("19.99"));
+        final OrderSagaInput input = new OrderSagaInput(sagaId, "biz-key-1", "SKU-1", 3, new BigDecimal("19.99"));
 
         assertThat(input.sagaId()).isEqualTo(sagaId);
         assertThat(input.businessKey()).isEqualTo("biz-key-1");

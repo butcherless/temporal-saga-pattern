@@ -8,7 +8,7 @@ class SagaExceptionTest {
 
     @Test
     void temporarySagaException_isClassifiedAsTemporary() {
-        TemporarySagaException exception = new TemporarySagaException("timeout calling Inventory Service");
+        final TemporarySagaException exception = new TemporarySagaException("timeout calling Inventory Service");
 
         assertThat(exception.errorType()).isEqualTo(ErrorType.TEMPORARY);
         assertThat(exception.getMessage()).isEqualTo("timeout calling Inventory Service");
@@ -17,7 +17,7 @@ class SagaExceptionTest {
 
     @Test
     void permanentSagaException_isClassifiedAsPermanent() {
-        PermanentSagaException exception = new PermanentSagaException("payment declined by the provider");
+        final PermanentSagaException exception = new PermanentSagaException("payment declined by the provider");
 
         assertThat(exception.errorType()).isEqualTo(ErrorType.PERMANENT);
         assertThat(exception.getMessage()).isEqualTo("payment declined by the provider");
@@ -25,9 +25,9 @@ class SagaExceptionTest {
 
     @Test
     void preservesRootCause() {
-        RuntimeException rootCause = new RuntimeException("connection reset");
+        final RuntimeException rootCause = new RuntimeException("connection reset");
 
-        TemporarySagaException exception = new TemporarySagaException("timeout calling Payment Service", rootCause);
+        final TemporarySagaException exception = new TemporarySagaException("timeout calling Payment Service", rootCause);
 
         assertThat(exception.getCause()).isSameAs(rootCause);
     }

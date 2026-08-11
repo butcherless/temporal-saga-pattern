@@ -12,4 +12,8 @@ public interface PaymentActivities {
 
     @ActivityMethod
     void requestPayment(UUID sagaId, BigDecimal amount);
+
+    /** Compensation: reverses a completed charge. */
+    @ActivityMethod
+    void refundPayment(UUID sagaId);
 }

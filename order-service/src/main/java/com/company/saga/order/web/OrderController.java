@@ -1,5 +1,6 @@
 package com.company.saga.order.web;
 
+import com.company.saga.order.service.CancelOrderRequest;
 import com.company.saga.order.service.ConfirmOrderRequest;
 import com.company.saga.order.service.OrderProgressionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -63,5 +64,18 @@ public class OrderController {
 
         return orderProgressionService.confirmOrder(new ConfirmOrderRequest(sagaId, Instant.now()))
                 .map(order -> ResponseEntity.ok(new ConfirmOrderResponseBody(order.id(), order.status())));
+    }
+
+    @PostMapping("/{sagaId}/cancel")
+    @Operation(
+            summary = "Cancel an order",
+            description = "Compensation: called by the saga Workflow when a later step permanently fails. Idempotent by sagaId.")
+    @ApiResponse(responseCode = "200", description = "Order cancelled (or already was)")
+    public Mono<ResponseEntity<CancelOrderResponseBody>> cancelOrder(
+            @PathVariable("sagaId") @Parameter(description = "The saga id, also the order's id") final UUID sagaId) {
+        log.debug("cancelOrder - {}", sagaId);
+
+        return orderProgressionService.cancelOrder(new CancelOrderRequest(sagaId, Instant.now()))
+                .map(order -> ResponseEntity.ok(new CancelOrderResponseBody(order.id(), order.status())));
     }
 }

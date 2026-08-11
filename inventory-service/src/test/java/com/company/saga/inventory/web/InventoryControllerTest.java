@@ -1,5 +1,7 @@
 package com.company.saga.inventory.web;
 
+import com.company.saga.common.error.PermanentSagaException;
+import com.company.saga.common.error.TemporarySagaException;
 import com.company.saga.inventory.domain.InventoryReservation;
 import com.company.saga.inventory.domain.ReservationStatus;
 import com.company.saga.inventory.service.InventoryProgressionService;
@@ -10,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.reactive.server.WebTestClient.ResponseSpec;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -52,16 +55,43 @@ class InventoryControllerTest {
 
     @Test
     void reserveStockRejectsAnInvalidRequestBodyWithAProblemDetail() {
-        client.post().uri("/inventory/reservations")
+        final ResponseSpec response = client.post().uri("/inventory/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","sku":"SKU-001","quantity":-1}""".formatted(UUID.randomUUID()))
-                .exchange()
-                .expectStatus().isBadRequest()
-                .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .expectBody()
-                .jsonPath("$.status").isEqualTo(400)
-                .jsonPath("$.detail").isEqualTo("quantity must be positive");
+                .exchange();
+
+        assertProblemDetail(response, 400, "quantity must be positive");
+    }
+
+    @Test
+    void reserveStockReturns422WhenStockIsPermanentlyInsufficient() {
+        final UUID sagaId = UUID.randomUUID();
+        when(inventoryProgressionService.reserveStock(any()))
+                .thenReturn(Mono.error(new PermanentSagaException("Insufficient stock for SKU-001: requested 999, available 100")));
+
+        final ResponseSpec response = client.post().uri("/inventory/reservations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"sagaId":"%s","sku":"SKU-001","quantity":999}""".formatted(sagaId))
+                .exchange();
+
+        assertProblemDetail(response, 422, "Insufficient stock for SKU-001: requested 999, available 100");
+    }
+
+    @Test
+    void reserveStockReturns503WhenTheGatewayTimesOut() {
+        final UUID sagaId = UUID.randomUUID();
+        when(inventoryProgressionService.reserveStock(any()))
+                .thenReturn(Mono.error(new TemporarySagaException("Simulated inventory gateway timeout for sku SKU-INPUTDATA-2")));
+
+        final ResponseSpec response = client.post().uri("/inventory/reservations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"sagaId":"%s","sku":"SKU-INPUTDATA-2","quantity":5}""".formatted(sagaId))
+                .exchange();
+
+        assertProblemDetail(response, 503, "Simulated inventory gateway timeout for sku SKU-INPUTDATA-2");
     }
 
     @Test
@@ -76,5 +106,43 @@ class InventoryControllerTest {
                 .expectBody()
                 .jsonPath("$.sagaId").isEqualTo(sagaId.toString())
                 .jsonPath("$.status").isEqualTo(ReservationStatus.CONFIRMED.name());
+    }
+
+    @Test
+    void releaseStockReturns200WithTheReleasedStatus() {
+        final UUID sagaId = UUID.randomUUID();
+        final InventoryReservation released = InventoryReservation.reserve(sagaId, "SKU-001", 5, Instant.now()).release(Instant.now());
+        when(inventoryProgressionService.releaseStock(any())).thenReturn(Mono.just(released));
+
+        client.post().uri("/inventory/reservations/{sagaId}/release", sagaId)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.sagaId").isEqualTo(sagaId.toString())
+                .jsonPath("$.status").isEqualTo(ReservationStatus.RELEASED.name());
+    }
+
+    @Test
+    void releaseStockReturns422WhenTheReleaseIsPermanentlyUnrecoverable() {
+        final UUID sagaId = UUID.randomUUID();
+        when(inventoryProgressionService.releaseStock(any()))
+                .thenReturn(Mono.error(new PermanentSagaException("Simulated unrecoverable release failure for sku SKU-INPUTDATA-6")));
+
+        final ResponseSpec response = client.post().uri("/inventory/reservations/{sagaId}/release", sagaId).exchange();
+
+        assertProblemDetail(response, 422, "Simulated unrecoverable release failure for sku SKU-INPUTDATA-6");
+    }
+
+    /**
+     * Shared shape behind every {@code ProblemDetail} assertion above (400 for bad input, 422/503
+     * for the two {@code SagaException} classifications): status code, {@code application/problem+json}
+     * content type, and the {@code $.status}/{@code $.detail} body fields.
+     */
+    private static void assertProblemDetail(final ResponseSpec response, final int expectedStatus, final String expectedDetail) {
+        response.expectStatus().isEqualTo(expectedStatus)
+                .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(expectedStatus)
+                .jsonPath("$.detail").isEqualTo(expectedDetail);
     }
 }

@@ -14,4 +14,8 @@ public interface InventoryActivities {
 
     @ActivityMethod
     void confirmReservation(UUID sagaId);
+
+    /** Compensation: credits the reserved stock back. */
+    @ActivityMethod
+    void releaseStock(UUID sagaId);
 }

@@ -28,4 +28,14 @@ public class OrderActivitiesImpl implements OrderActivities {
                 .toBodilessEntity()
                 .block();
     }
+
+    @Override
+    public void cancelOrder(final UUID sagaId) {
+        log.debug("cancelOrder - sagaId={}", sagaId);
+        orderWebClient.post()
+                .uri("/orders/{sagaId}/cancel", sagaId)
+                .retrieve()
+                .toBodilessEntity()
+                .block();
+    }
 }

@@ -1,8 +1,10 @@
 package com.company.saga.payment.web;
 
 import com.company.saga.payment.service.PaymentProgressionService;
+import com.company.saga.payment.service.RefundPaymentRequest;
 import com.company.saga.payment.service.RequestPaymentRequest;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -11,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +22,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 
 /** REST entry point for requesting a payment, called synchronously by the order saga Workflow's PaymentActivities. */
 @RestController
@@ -46,5 +50,18 @@ public class PaymentController {
         return paymentProgressionService.requestPayment(new RequestPaymentRequest(request.sagaId(), request.amount(), Instant.now()))
                 .map(payment -> ResponseEntity.status(HttpStatus.CREATED)
                         .body(new PaymentResponseBody(payment.id(), payment.status())));
+    }
+
+    @PostMapping("/{sagaId}/refund")
+    @Operation(
+            summary = "Refund a payment",
+            description = "Compensation: called when a later saga step permanently fails, reversing a completed charge. Idempotent by sagaId.")
+    @ApiResponse(responseCode = "200", description = "Payment refunded (or already was)")
+    public Mono<ResponseEntity<PaymentResponseBody>> refundPayment(
+            @PathVariable("sagaId") @Parameter(description = "The saga id, also the payment's id") final UUID sagaId) {
+        log.debug("refundPayment - {}", sagaId);
+
+        return paymentProgressionService.refundPayment(new RefundPaymentRequest(sagaId, Instant.now()))
+                .map(payment -> ResponseEntity.ok(new PaymentResponseBody(payment.id(), payment.status())));
     }
 }

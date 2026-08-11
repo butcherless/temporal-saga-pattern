@@ -81,4 +81,18 @@ class OrderControllerTest {
                 .jsonPath("$.sagaId").isEqualTo(sagaId.toString())
                 .jsonPath("$.status").isEqualTo(OrderStatus.CONFIRMED.name());
     }
+
+    @Test
+    void cancelOrderReturns200WithTheCancelledStatus() {
+        final UUID sagaId = UUID.randomUUID();
+        final CustomerOrder cancelledOrder = CustomerOrder.create(sagaId, "ORDER-2026-600003", Instant.now()).cancel(Instant.now());
+        when(orderProgressionService.cancelOrder(any())).thenReturn(Mono.just(cancelledOrder));
+
+        client.post().uri("/orders/{sagaId}/cancel", sagaId)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.sagaId").isEqualTo(sagaId.toString())
+                .jsonPath("$.status").isEqualTo(OrderStatus.CANCELLED.name());
+    }
 }

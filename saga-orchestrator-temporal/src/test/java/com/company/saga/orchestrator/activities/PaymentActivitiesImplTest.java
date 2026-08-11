@@ -1,26 +1,18 @@
 package com.company.saga.orchestrator.activities;
 
+import io.temporal.failure.ApplicationFailure;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.reactive.function.client.ClientRequest;
-import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentActivitiesImplTest {
@@ -32,9 +24,8 @@ class PaymentActivitiesImplTest {
 
     @BeforeEach
     void setUp() {
-        final WebClient webClient = WebClient.builder().exchangeFunction(exchangeFunction).build();
-        activities = new PaymentActivitiesImpl(webClient);
-        when(exchangeFunction.exchange(any())).thenReturn(Mono.just(ClientResponse.create(HttpStatus.CREATED).build()));
+        activities = new PaymentActivitiesImpl(ExchangeFunctionStub.webClientFor(exchangeFunction));
+        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.CREATED);
     }
 
     @Test
@@ -43,9 +34,37 @@ class PaymentActivitiesImplTest {
 
         activities.requestPayment(sagaId, new BigDecimal("49.99"));
 
-        final ArgumentCaptor<ClientRequest> requestCaptor = ArgumentCaptor.forClass(ClientRequest.class);
-        verify(exchangeFunction).exchange(requestCaptor.capture());
-        assertThat(requestCaptor.getValue().method()).isEqualTo(HttpMethod.POST);
-        assertThat(requestCaptor.getValue().url().getPath()).isEqualTo("/payments");
+        ExchangeFunctionStub.assertPostedTo(exchangeFunction, "/payments");
+    }
+
+    @Test
+    void requestPaymentThrowsANonRetryableFailureWhenTheGatewayPermanentlyDeclinesThePayment() {
+        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Payment declined for amount 15000.00");
+
+        assertThatThrownBy(() -> activities.requestPayment(UUID.randomUUID(), new BigDecimal("15000.00")))
+                .isInstanceOf(ApplicationFailure.class)
+                .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
+                .isEqualTo(true);
+    }
+
+    @Test
+    void refundPaymentPostsToTheRefundEndpointForTheGivenSagaId() {
+        final UUID sagaId = UUID.randomUUID();
+        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.OK);
+
+        activities.refundPayment(sagaId);
+
+        ExchangeFunctionStub.assertPostedTo(exchangeFunction, "/payments/%s/refund".formatted(sagaId));
+    }
+
+    @Test
+    void refundPaymentThrowsANonRetryableFailureWhenTheRefundIsPermanentlyUnrecoverable() {
+        ExchangeFunctionStub.stubResponse(
+                exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Simulated unrecoverable refund failure for amount 750.00");
+
+        assertThatThrownBy(() -> activities.refundPayment(UUID.randomUUID()))
+                .isInstanceOf(ApplicationFailure.class)
+                .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
+                .isEqualTo(true);
     }
 }

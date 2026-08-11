@@ -2,6 +2,7 @@ package com.company.saga.inventory.web;
 
 import com.company.saga.inventory.service.ConfirmReservationRequest;
 import com.company.saga.inventory.service.InventoryProgressionService;
+import com.company.saga.inventory.service.ReleaseStockRequest;
 import com.company.saga.inventory.service.ReserveStockRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -62,6 +63,19 @@ public class InventoryController {
         log.debug("confirmReservation - {}", sagaId);
 
         return inventoryProgressionService.confirmReservation(new ConfirmReservationRequest(sagaId, Instant.now()))
+                .map(reservation -> ResponseEntity.ok(new ReservationResponseBody(reservation.id(), reservation.status())));
+    }
+
+    @PostMapping("/{sagaId}/release")
+    @Operation(
+            summary = "Release a reservation",
+            description = "Compensation: called when a later saga step permanently fails, crediting the stock back. Idempotent by sagaId.")
+    @ApiResponse(responseCode = "200", description = "Reservation released (or already was)")
+    public Mono<ResponseEntity<ReservationResponseBody>> releaseStock(
+            @PathVariable("sagaId") @Parameter(description = "The saga id, also the reservation's id") final UUID sagaId) {
+        log.debug("releaseStock - {}", sagaId);
+
+        return inventoryProgressionService.releaseStock(new ReleaseStockRequest(sagaId, Instant.now()))
                 .map(reservation -> ResponseEntity.ok(new ReservationResponseBody(reservation.id(), reservation.status())));
     }
 }

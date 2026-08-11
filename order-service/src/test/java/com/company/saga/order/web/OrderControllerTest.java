@@ -2,8 +2,10 @@ package com.company.saga.order.web;
 
 import com.company.saga.common.error.PermanentSagaException;
 import com.company.saga.common.error.TemporarySagaException;
+import com.company.saga.common.workflow.OrderSagaProgress;
 import com.company.saga.order.domain.CustomerOrder;
 import com.company.saga.order.domain.IllegalOrderTransitionException;
+import com.company.saga.order.domain.OrderNotFoundException;
 import com.company.saga.order.domain.OrderStatus;
 import com.company.saga.order.service.OrderProgressionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,11 +33,14 @@ class OrderControllerTest {
     @Mock
     private OrderProgressionService orderProgressionService;
 
+    @Mock
+    private OrderQueryHandler orderQueryHandler;
+
     private WebTestClient client;
 
     @BeforeEach
     void setUp() {
-        client = WebTestClient.bindToController(new OrderController(orderCreationHandler, orderProgressionService))
+        client = WebTestClient.bindToController(new OrderController(orderCreationHandler, orderProgressionService, orderQueryHandler))
                 .controllerAdvice(new RestExceptionHandler())
                 .build();
     }
@@ -151,10 +156,49 @@ class OrderControllerTest {
                 .expectStatus().is5xxServerError();
     }
 
+    @Test
+    void getOrderStatusReturns200WithLiveProgressWhilePending() {
+        final UUID sagaId = UUID.randomUUID();
+        when(orderQueryHandler.getOrderStatus(sagaId))
+                .thenReturn(Mono.just(new OrderStatusResponseBody(sagaId, OrderStatus.PENDING, OrderSagaProgress.PAYMENT_REQUESTED)));
+
+        client.get().uri("/orders/{sagaId}", sagaId)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.sagaId").isEqualTo(sagaId.toString())
+                .jsonPath("$.orderStatus").isEqualTo(OrderStatus.PENDING.name())
+                .jsonPath("$.sagaProgress").isEqualTo(OrderSagaProgress.PAYMENT_REQUESTED.name());
+    }
+
+    @Test
+    void getOrderStatusReturns200WithCompletedProgressOnceConfirmed() {
+        final UUID sagaId = UUID.randomUUID();
+        when(orderQueryHandler.getOrderStatus(sagaId))
+                .thenReturn(Mono.just(new OrderStatusResponseBody(sagaId, OrderStatus.CONFIRMED, OrderSagaProgress.COMPLETED)));
+
+        client.get().uri("/orders/{sagaId}", sagaId)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.orderStatus").isEqualTo(OrderStatus.CONFIRMED.name())
+                .jsonPath("$.sagaProgress").isEqualTo(OrderSagaProgress.COMPLETED.name());
+    }
+
+    @Test
+    void getOrderStatusReturns404WhenTheOrderDoesNotExist() {
+        final UUID sagaId = UUID.randomUUID();
+        when(orderQueryHandler.getOrderStatus(sagaId)).thenReturn(Mono.error(new OrderNotFoundException(sagaId)));
+
+        final ResponseSpec response = client.get().uri("/orders/{sagaId}", sagaId).exchange();
+
+        assertProblemDetail(response, 404, "Order not found: %s".formatted(sagaId));
+    }
+
     /**
-     * Shared shape behind every {@code ProblemDetail} assertion above (400 for bad input, 422/503
-     * for the two {@code SagaException} classifications): status code, {@code application/problem+json}
-     * content type, and the {@code $.status}/{@code $.detail} body fields.
+     * Shared shape behind every {@code ProblemDetail} assertion above (400 for bad input, 404 for
+     * an unknown sagaId, 422/503 for the two {@code SagaException} classifications): status code,
+     * {@code application/problem+json} content type, and the {@code $.status}/{@code $.detail} body fields.
      */
     private static void assertProblemDetail(final ResponseSpec response,
             final int expectedStatus,

@@ -3,6 +3,7 @@ package com.company.saga.order.service;
 import com.company.saga.common.error.PermanentSagaException;
 import com.company.saga.order.domain.CustomerOrder;
 import com.company.saga.order.domain.IllegalOrderTransitionException;
+import com.company.saga.order.domain.OrderNotFoundException;
 import com.company.saga.order.domain.OrderStatus;
 import com.company.saga.order.persistence.OrderRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -74,6 +75,18 @@ public class OrderProgressionService {
                 .flatMap(order -> order.status() == OrderStatus.CANCELLED
                         ? Mono.just(order)
                         : orderRepository.save(order.cancel(request.now())));
+    }
+
+    /**
+     * Reads the order for {@code sagaId}, for {@code GET /orders/{sagaId}}. Unlike {@link #loadOrder},
+     * which backs {@code confirmOrder}/{@code cancelOrder}'s "this sagaId must already have an
+     * order" internal invariant, a missing order here is a legitimate outcome of a caller-supplied
+     * id — {@link OrderNotFoundException} maps to a 404, not the invariant violation's 500.
+     */
+    public Mono<CustomerOrder> getOrder(final UUID sagaId) {
+        log.debug("getOrder - {}", sagaId);
+        return orderRepository.findById(sagaId)
+                .switchIfEmpty(Mono.error(() -> new OrderNotFoundException(sagaId)));
     }
 
     /**

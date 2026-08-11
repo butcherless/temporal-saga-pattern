@@ -1,6 +1,7 @@
 package com.company.saga.orchestrator.workflow;
 
 import com.company.saga.common.workflow.OrderSagaInput;
+import com.company.saga.common.workflow.OrderSagaProgress;
 import com.company.saga.common.workflow.OrderSagaWorkflow;
 import com.company.saga.orchestrator.activities.InventoryActivities;
 import com.company.saga.orchestrator.activities.OrderActivities;
@@ -44,6 +45,8 @@ public class OrderSagaWorkflowImpl implements OrderSagaWorkflow {
     private final PaymentActivities paymentActivities = Workflow.newActivityStub(PaymentActivities.class, ACTIVITY_OPTIONS);
     private final OrderActivities orderActivities = Workflow.newActivityStub(OrderActivities.class, ACTIVITY_OPTIONS);
 
+    private OrderSagaProgress progress = OrderSagaProgress.STARTED;
+
     @Override
     public void process(final OrderSagaInput input) {
         // continueWithError: a failed refund (proposal §17.3 scenario 8) must not stop the
@@ -52,13 +55,17 @@ public class OrderSagaWorkflowImpl implements OrderSagaWorkflow {
         try {
             inventoryActivities.reserveStock(input.sagaId(), input.sku(), input.quantity());
             saga.addCompensation(inventoryActivities::releaseStock, input.sagaId());
+            progress = OrderSagaProgress.INVENTORY_RESERVED;
 
             paymentActivities.requestPayment(input.sagaId(), input.amount());
             saga.addCompensation(paymentActivities::refundPayment, input.sagaId());
+            progress = OrderSagaProgress.PAYMENT_REQUESTED;
 
             orderActivities.confirmOrder(input.sagaId());
             inventoryActivities.confirmReservation(input.sagaId());
+            progress = OrderSagaProgress.COMPLETED;
         } catch (final RuntimeException error) {
+            progress = OrderSagaProgress.COMPENSATING;
             // Compensations run in reverse order (refund before release). If they all succeed,
             // saga.compensate() returns normally — the original error is rethrown explicitly so
             // the Workflow Execution still fails instead of looking like it succeeded.
@@ -67,7 +74,13 @@ public class OrderSagaWorkflowImpl implements OrderSagaWorkflow {
             // what turns that dangling PENDING into a correct terminal state, for every failure
             // path (not just the ones that also unwind inventory/payment).
             orderActivities.cancelOrder(input.sagaId());
+            progress = OrderSagaProgress.COMPENSATED;
             throw error;
         }
+    }
+
+    @Override
+    public OrderSagaProgress getProgress() {
+        return progress;
     }
 }

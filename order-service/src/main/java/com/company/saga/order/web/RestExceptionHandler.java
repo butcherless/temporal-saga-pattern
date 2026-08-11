@@ -2,6 +2,7 @@ package com.company.saga.order.web;
 
 import com.company.saga.common.error.PermanentSagaException;
 import com.company.saga.common.error.TemporarySagaException;
+import com.company.saga.order.domain.OrderNotFoundException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -67,5 +68,13 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
             final ServerWebExchange exchange) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
         return handleExceptionInternal(ex, problemDetail, new HttpHeaders(), HttpStatus.SERVICE_UNAVAILABLE, exchange);
+    }
+
+    @ExceptionHandler(OrderNotFoundException.class)
+    public Mono<ResponseEntity<Object>> handleOrderNotFoundException(
+            final OrderNotFoundException ex,
+            final ServerWebExchange exchange) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        return handleExceptionInternal(ex, problemDetail, new HttpHeaders(), HttpStatus.NOT_FOUND, exchange);
     }
 }

@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,11 +34,14 @@ public class OrderController {
 
     private final OrderCreationHandler orderCreationHandler;
     private final OrderProgressionService orderProgressionService;
+    private final OrderQueryHandler orderQueryHandler;
 
     public OrderController(final OrderCreationHandler orderCreationHandler,
-            final OrderProgressionService orderProgressionService) {
+            final OrderProgressionService orderProgressionService,
+            final OrderQueryHandler orderQueryHandler) {
         this.orderCreationHandler = Objects.requireNonNull(orderCreationHandler, "orderCreationHandler must not be null");
         this.orderProgressionService = Objects.requireNonNull(orderProgressionService, "orderProgressionService must not be null");
+        this.orderQueryHandler = Objects.requireNonNull(orderQueryHandler, "orderQueryHandler must not be null");
     }
 
     @PostMapping
@@ -78,5 +82,19 @@ public class OrderController {
 
         return orderProgressionService.cancelOrder(new CancelOrderRequest(sagaId, Instant.now()))
                 .map(order -> ResponseEntity.ok(new CancelOrderResponseBody(order.id(), order.status())));
+    }
+
+    @GetMapping("/{sagaId}")
+    @Operation(
+            summary = "Get order status",
+            description = "Reads the order's durable status; while still PENDING, also reads live saga progress from the Workflow.")
+    @ApiResponse(responseCode = "200", description = "Current order/saga status")
+    @ApiResponse(responseCode = "404", description = "No order with this sagaId",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    public Mono<ResponseEntity<OrderStatusResponseBody>> getOrderStatus(
+            @PathVariable("sagaId") @Parameter(description = "The saga id, also the order's id") final UUID sagaId) {
+        log.debug("getOrderStatus - {}", sagaId);
+
+        return orderQueryHandler.getOrderStatus(sagaId).map(ResponseEntity::ok);
     }
 }

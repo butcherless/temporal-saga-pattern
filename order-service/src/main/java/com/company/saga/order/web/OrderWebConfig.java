@@ -11,9 +11,10 @@ import reactor.core.scheduler.Schedulers;
 import java.util.concurrent.Executors;
 
 /**
- * Wires {@link OrderProgressionService} and {@link OrderCreationHandler}. {@link WorkflowClient}
- * itself comes from {@code temporal-spring-boot-starter}'s own auto-configuration (this service
- * only starts Workflow Executions, it never registers a Worker).
+ * Wires {@link OrderProgressionService}, {@link OrderCreationHandler}, and
+ * {@link OrderQueryHandler}. {@link WorkflowClient} itself comes from
+ * {@code temporal-spring-boot-starter}'s own auto-configuration (this service only starts and
+ * queries Workflow Executions, it never registers a Worker).
  */
 @Configuration
 public class OrderWebConfig {
@@ -43,5 +44,19 @@ public class OrderWebConfig {
             final WorkflowClient workflowClient,
             final Scheduler orderSagaStartScheduler) {
         return new OrderCreationHandler(orderProgressionService, workflowClient, orderSagaStartScheduler);
+    }
+
+    /**
+     * Backs {@link OrderQueryHandler}'s blocking Workflow query, the same bridge shape as
+     * {@link #orderCreationHandler}'s {@code WorkflowClient.start} call — reuses
+     * {@link #orderSagaStartScheduler} rather than a second bean, since neither call is CPU-bound
+     * and query volume doesn't warrant isolating it from the start path at this scale.
+     */
+    @Bean
+    public OrderQueryHandler orderQueryHandler(
+            final OrderProgressionService orderProgressionService,
+            final WorkflowClient workflowClient,
+            final Scheduler orderSagaStartScheduler) {
+        return new OrderQueryHandler(orderProgressionService, workflowClient, orderSagaStartScheduler);
     }
 }

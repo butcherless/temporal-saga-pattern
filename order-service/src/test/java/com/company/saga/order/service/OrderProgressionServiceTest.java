@@ -3,6 +3,7 @@ package com.company.saga.order.service;
 import com.company.saga.common.error.PermanentSagaException;
 import com.company.saga.order.domain.CustomerOrder;
 import com.company.saga.order.domain.IllegalOrderTransitionException;
+import com.company.saga.order.domain.OrderNotFoundException;
 import com.company.saga.order.domain.OrderStatus;
 import com.company.saga.order.domain.OrderTestClock;
 import com.company.saga.order.persistence.OrderRepository;
@@ -169,6 +170,33 @@ class OrderProgressionServiceTest {
 
         StepVerifier.create(service.cancelOrder(new CancelOrderRequest(sagaId, NOW)))
                 .expectError(IllegalStateException.class)
+                .verify();
+    }
+
+    @Test
+    void getOrderReturnsTheOrderWhenItExists() {
+        final UUID sagaId = UUID.randomUUID();
+        final CustomerOrder pending = CustomerOrder.create(sagaId, BUSINESS_KEY, NOW);
+        when(orderRepository.findById(sagaId)).thenReturn(Mono.just(pending));
+
+        StepVerifier.create(service.getOrder(sagaId))
+                .assertNext(order -> assertThat(order).isEqualTo(pending))
+                .verifyComplete();
+    }
+
+    /**
+     * Unlike {@code confirmOrder}/{@code cancelOrder}'s "this sagaId must already have an order"
+     * internal invariant ({@code IllegalStateException}), a missing order here is a legitimate
+     * outcome of a caller-supplied sagaId in {@code GET /orders/{sagaId}}, so it's a dedicated
+     * {@link OrderNotFoundException} instead — see the exception's own javadoc.
+     */
+    @Test
+    void getOrderFailsWithOrderNotFoundExceptionWhenTheOrderDoesNotExist() {
+        final UUID sagaId = UUID.randomUUID();
+        when(orderRepository.findById(sagaId)).thenReturn(Mono.empty());
+
+        StepVerifier.create(service.getOrder(sagaId))
+                .expectError(OrderNotFoundException.class)
                 .verify();
     }
 }

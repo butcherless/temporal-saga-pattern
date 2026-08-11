@@ -1,5 +1,6 @@
 package com.company.saga.common.workflow;
 
+import io.temporal.workflow.QueryMethod;
 import io.temporal.workflow.WorkflowInterface;
 import io.temporal.workflow.WorkflowMethod;
 
@@ -13,4 +14,8 @@ public interface OrderSagaWorkflow {
 
     @WorkflowMethod
     void process(OrderSagaInput input);
+
+    /** Live saga progress, for {@code GET /orders/{sagaId}} to poll while still {@code PENDING}. */
+    @QueryMethod
+    OrderSagaProgress getProgress();
 }

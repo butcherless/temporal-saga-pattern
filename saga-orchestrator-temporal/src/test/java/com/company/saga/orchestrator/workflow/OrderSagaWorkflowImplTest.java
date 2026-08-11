@@ -1,6 +1,7 @@
 package com.company.saga.orchestrator.workflow;
 
 import com.company.saga.common.workflow.OrderSagaInput;
+import com.company.saga.common.workflow.OrderSagaProgress;
 import com.company.saga.common.workflow.OrderSagaWorkflow;
 import com.company.saga.orchestrator.activities.InventoryActivities;
 import com.company.saga.orchestrator.activities.OrderActivities;
@@ -57,6 +58,7 @@ class OrderSagaWorkflowImplTest {
                 "requestPayment(%s,49.99)".formatted(sagaId),
                 "confirmOrder(%s)".formatted(sagaId),
                 "confirmReservation(%s)".formatted(sagaId));
+        assertThat(workflow.getProgress()).isEqualTo(OrderSagaProgress.COMPLETED);
     }
 
     /**
@@ -80,6 +82,7 @@ class OrderSagaWorkflowImplTest {
                 "requestPayment(%s,49.99)".formatted(sagaId),
                 "confirmOrder(%s)".formatted(sagaId),
                 "confirmReservation(%s)".formatted(sagaId));
+        assertThat(workflow.getProgress()).isEqualTo(OrderSagaProgress.COMPLETED);
     }
 
     /**
@@ -101,6 +104,7 @@ class OrderSagaWorkflowImplTest {
         assertThat(callLog).containsExactly(
                 "reserveStock(%s,SKU-001,999)".formatted(sagaId),
                 "cancelOrder(%s)".formatted(sagaId));
+        assertThat(workflow.getProgress()).isEqualTo(OrderSagaProgress.COMPENSATED);
     }
 
     /**
@@ -126,6 +130,7 @@ class OrderSagaWorkflowImplTest {
                 "refundPayment(%s)".formatted(sagaId),
                 "releaseStock(%s)".formatted(sagaId),
                 "cancelOrder(%s)".formatted(sagaId));
+        assertThat(workflow.getProgress()).isEqualTo(OrderSagaProgress.COMPENSATED);
     }
 
     /**
@@ -150,6 +155,7 @@ class OrderSagaWorkflowImplTest {
                 "refundPayment(%s)".formatted(sagaId),
                 "releaseStock(%s)".formatted(sagaId),
                 "cancelOrder(%s)".formatted(sagaId));
+        assertThat(workflow.getProgress()).isEqualTo(OrderSagaProgress.COMPENSATED);
     }
 
     private OrderSagaWorkflow newWorkflowStub(final String businessKey,

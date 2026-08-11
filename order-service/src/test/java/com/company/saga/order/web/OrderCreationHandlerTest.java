@@ -1,6 +1,7 @@
 package com.company.saga.order.web;
 
 import com.company.saga.common.workflow.OrderSagaInput;
+import com.company.saga.common.workflow.OrderSagaProgress;
 import com.company.saga.common.workflow.OrderSagaWorkflow;
 import com.company.saga.common.workflow.SagaTaskQueues;
 import com.company.saga.order.domain.CustomerOrder;
@@ -162,6 +163,11 @@ class OrderCreationHandlerTest {
             if (BLOCK_FOREVER_SKU.equals(input.sku())) {
                 Workflow.await(() -> false);
             }
+        }
+
+        @Override
+        public OrderSagaProgress getProgress() {
+            return OrderSagaProgress.STARTED;
         }
     }
 }

@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.UUID;
 
@@ -46,6 +47,21 @@ class OrderActivitiesImplTest {
                 .isInstanceOf(ApplicationFailure.class)
                 .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
                 .isEqualTo(true);
+    }
+
+    /**
+     * The non-422 half of {@code toActivityFailure}'s branch: a transient gateway fault must
+     * pass through unchanged (still a plain {@link WebClientResponseException}, never wrapped as
+     * non-retryable) so {@code OrderSagaWorkflowImpl}'s bounded {@code RetryOptions} still retries
+     * it, the same as before this classification existed.
+     */
+    @Test
+    void confirmOrderRethrowsUnchangedWhenTheFailureIsNotPermanent() {
+        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.SERVICE_UNAVAILABLE, "Simulated order confirmation gateway timeout");
+
+        assertThatThrownBy(() -> activities.confirmOrder(UUID.randomUUID()))
+                .isInstanceOf(WebClientResponseException.class)
+                .isNotInstanceOf(ApplicationFailure.class);
     }
 
     @Test

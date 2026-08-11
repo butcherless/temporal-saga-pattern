@@ -38,10 +38,36 @@ services:
 spring:
   config:
     activate:
+      on-profile: '!local'
+
+# Structured (ECS) console logging outside local dev, via Spring Boot 4.1's built-in
+# logging.structured.format.* support instead of a hand-maintained logback-spring.xml — with
+# micrometer-tracing on the classpath, this automatically embeds trace/span IDs in every line, no
+# custom encoder needed. Kept out of the local profile: platform-test/scripts/e2e-*.sh grep
+# plain-text substrings (e.g. "activityType=ReserveStock") out of console output redirected to a
+# file, and JSON is also just harder to read interactively during spring-boot:run.
+logging:
+  structured:
+    format:
+      console: ecs
+
+---
+spring:
+  config:
+    activate:
       on-profile: local
 
-# DEBUG for this app's own code only (not Spring/Temporal/etc) — logback-spring.xml's root
-# stays at INFO in every profile.
+# DEBUG for this app's own code only (not Spring/Temporal/etc). logging.file.name gives local
+# dev a persistent /tmp trace file via Spring Boot's own rolling file appender (no custom
+# logback-spring.xml needed); clean-history-on-start approximates the previous custom appender's
+# fresh-file-per-run behavior as closely as the built-in rolling policy allows — the *current*
+# file itself still gets appended to across restarts within a policy period, unlike the old
+# append=false FileAppender.
 logging:
   level:
     com.company.saga: DEBUG
+  file:
+    name: /tmp/saga-orchestrator-temporal.log
+  logback:
+    rollingpolicy:
+      clean-history-on-start: true

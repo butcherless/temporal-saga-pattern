@@ -8,7 +8,7 @@ A second implementation of the same Saga Pattern exercise as the sibling repo **
 
 The design rationale — what maps to what between the two implementations, what's reused, what's new, and the trade-offs — lives in **[`docs/temporal-saga-proposal.md`](./docs/temporal-saga-proposal.md)** (in Spanish, the language it was authored in — like `saga-pattern-poc`'s own `propuesta-saga-pattern-java-springboot-v4.md`, it's a source design doc and isn't translated). Read it before extending this repo; this file only covers what you need to operate it day to day.
 
-**Current state:** scaffold + happy path only (reserve stock → charge payment → confirm the order → confirm the reservation), with an end-to-end IT proving `POST /orders` drives the saga's Workflow Execution to `COMPLETED`. Retry/backoff, compensation, and the rest of the reference scenarios are explicitly **not** implemented yet — see [Explicitly deferred](#explicitly-deferred) below.
+**Current state:** all 9 of proposal §17.3's reference scenarios that have a meaningful equivalent under Temporal are implemented and covered end-to-end — happy path, temporary retry (inventory/payment), permanent failure with no compensation needed (inventory/payment), full compensation via `io.temporal.workflow.Saga` (release-fails, refund-fails, full rollback), and idempotent duplicate order submission. Covered by unit tests, `TemporalEndToEndSagaIT` (JUnit + Testcontainers), and `platform-test/scripts/e2e-*.sh` (curl-based, against the real docker-compose stack). The two scenarios with no Temporal equivalent (out-of-order event, DLQ reprocessing — both inherently tied to a message broker this repo doesn't have) are out of scope, not deferred. See [Explicitly deferred](#explicitly-deferred) below for what's still genuinely open.
 
 ## Conventions
 
@@ -22,7 +22,7 @@ There is no `saga-orchestrator` module, no `SagaStatus` state machine, no `saga_
 
 ### Module layout
 
-- `saga-common` — shared, Spring-free: `error/` (the `SagaException`/`TemporarySagaException`/`PermanentSagaException` classification, carried over unchanged from `saga-pattern-poc`, not yet wired into any retry logic in this repo) and `workflow/` (the `OrderSagaWorkflow` contract + `OrderSagaInput` + `SagaTaskQueues` — the Temporal analogue of the old `Command`/`Event`/`MessageHeader` envelope, shared between whoever starts the saga and whoever executes it).
+- `saga-common` — shared, Spring-free: `error/` (the `SagaException`/`TemporarySagaException`/`PermanentSagaException` classification, carried over unchanged from `saga-pattern-poc`; each business service's `RestExceptionHandler` maps them to 503/422, which the orchestrator's Activities turn into a retryable vs. non-retryable `ApplicationFailure`) and `workflow/` (the `OrderSagaWorkflow` contract + `OrderSagaInput` + `SagaTaskQueues` — the Temporal analogue of the old `Command`/`Event`/`MessageHeader` envelope, shared between whoever starts the saga and whoever executes it).
 - `order-service`, `inventory-service`, `payment-service` — same `domain`/`persistence`/`service` packages as `saga-pattern-poc` (business rules and their idempotency-by-`sagaId`/`businessKey` are unchanged), no `messaging` package at all. `order-service`'s `web` package now starts the Workflow (`WorkflowClient.start(...)`) instead of writing to an outbox; `inventory-service` and `payment-service` each got a brand-new `web` package (they had none before — the custom implementation only ever consumed/produced Kafka) exposing the REST endpoints the orchestrator's Activities call.
 - `saga-orchestrator-temporal` — the Temporal Worker: `workflow/OrderSagaWorkflowImpl` (the saga itself) + `activities/` (three `@ActivityInterface`s, one per business service, each implemented as a `WebClient` call) + `config/ActivityWebClientConfig` (one `WebClient` bean per service, disambiguated by bean name/`@Qualifier` — same pattern `saga-pattern-poc` uses for its nested-transaction beans). Owns no database.
 - `platform-test` — `TemporalEndToEndSagaIT`: forks all four services as real `java -jar` processes (same reason as `saga-pattern-poc`'s `EndToEndSagaIT` — identically-named classpath resources across service jars rule out an in-process shared-classloader test) against a Testcontainers Postgres (only `order_db`/`inventory_db`/`payment_db` — no `saga_orchestrator_db`) and a Testcontainers `temporalio/temporal:1.8.2` dev server (`server start-dev`, in-memory, no schema of its own — lighter than `docker-compose.yml`'s production-style setup, appropriate for a test that tears everything down afterward).
@@ -38,7 +38,7 @@ docker compose up -d      # postgres:5432, temporal:7233 (gRPC), temporal-ui:808
 docker compose down       # stop; add -v to also drop the postgres/pgadmin volumes
 ```
 
-- PostgreSQL hosts only the three business databases (`order_db`, `inventory_db`, `payment_db`) — no `saga_orchestrator_db`.
+- PostgreSQL hosts only the three business databases (`order_db`, `inventory_db`, `payment_db`) — no `saga_orchestrator_db`. Credentials are `saga`/`saga` (`docker-compose.yml`'s `POSTGRES_USER`/`POSTGRES_PASSWORD`), not `postgres`; e.g. `docker exec saga-temporal-postgres psql -U saga -d order_db`.
 - Temporal runs as `temporalio/server` + a one-shot `temporalio/admin-tools` schema-setup service against that same Postgres container, following the current officially-documented self-hosted pattern (`temporalio/samples-server`'s `compose/docker-compose-postgres.yml`) — `temporalio/auto-setup`, the older all-in-one image, is deprecated.
 - **Temporal Web UI (http://localhost:8088)** is the equivalent of `saga-pattern-poc`'s Kafka UI for this repo: open a Workflow Execution to see its full event history (every Activity call, its input/output, retries) — no separate `saga_step` table to query.
 
@@ -60,12 +60,39 @@ Same pattern and port table as `saga-pattern-poc` (`saga-orchestrator-temporal` 
 
 `saga-orchestrator-temporal` and `order-service` both need `TEMPORAL_TARGET` set (defaults to `localhost:7233`, matching `docker compose up -d` above) to reach the Temporal Server; `order-service`/`inventory-service`/`payment-service` need the same `DB_*` env vars as in `saga-pattern-poc`.
 
+### Starting the full stack (correct order)
+
+Scripted equivalent: `platform-test/scripts/start-all.sh` (steps 1-5 below, then blocks in the foreground — Ctrl-C stops the four service processes; `docker compose` containers are left running).
+
+1. `docker compose up -d` — Postgres + Temporal Server + Temporal UI + pgAdmin (see [Local infra](#local-infra-postgresql--temporal) above). Wait until Postgres accepts connections and the Temporal Web UI (http://localhost:8088) loads before continuing — the business services run Flyway migrations at startup and fail fast without a live Postgres, and `order-service`/`saga-orchestrator-temporal` need a reachable Temporal Server just to connect.
+2. Register the `default` namespace — unlike the `temporalio/temporal server start-dev` dev server `platform-test`'s IT uses, `docker-compose.yml`'s production-style `temporalio/server` doesn't create it automatically, and `saga-orchestrator-temporal` fails to start without it (`NOT_FOUND: Namespace default is not found`). Only needed once per fresh Postgres volume:
+   ```bash
+   docker run --rm --network temporal-saga-pattern_default temporalio/admin-tools:1.31.2 \
+     temporal operator namespace create --address saga-temporal:7233 default
+   ```
+3. `./mvnw install -pl saga-common -DskipTests -q` — every other module depends on it.
+4. Start the three business services, one terminal each, in any relative order among themselves (`DB_*` env vars per `saga-pattern-poc`; `order-service` additionally needs `TEMPORAL_TARGET`):
+   ```bash
+   ./mvnw spring-boot:run -pl order-service
+   ./mvnw spring-boot:run -pl inventory-service
+   ./mvnw spring-boot:run -pl payment-service
+   ```
+5. Start the Temporal Worker last, once the business services are already listening — the moment it connects it starts executing any queued Workflow Tasks, which means calling those services' REST endpoints immediately:
+   ```bash
+   ./mvnw spring-boot:run -pl saga-orchestrator-temporal
+   ```
+6. Verify: `GET /actuator/health` on each service port (8080-8083), and open the Temporal Web UI (http://localhost:8088) to watch Workflow Executions as they run.
+
+### Stopping the full stack (reverse order)
+
+Scripted equivalent: `platform-test/scripts/stop-all.sh` (steps 1-3 below; uses `docker compose stop`, not `down`, so volumes and the registered namespace survive for the next `start-all.sh`).
+
+1. Stop `saga-orchestrator-temporal` first (Ctrl-C its terminal) — no new saga work gets executed once it's down.
+2. Stop the three business services (Ctrl-C each terminal), any relative order among themselves.
+3. `docker compose down` — stops Postgres/Temporal/pgAdmin (add `-v` to also drop the Postgres/pgAdmin volumes).
+
 ## Explicitly deferred
 
 Not implemented in this repo yet — see `docs/temporal-saga-proposal.md` for the full picture:
 
-- Retry/backoff (`RetryPolicy` on `ActivityOptions`) and TEMPORARY→PERMANENT classification via a non-retryable `ApplicationFailure`.
-- Compensation via the SDK's `io.temporal.workflow.Saga` helper (the reference scenarios where a permanent failure rolls back prior steps).
-- `releaseStock`/`refundPayment` endpoints and their Activities.
-- Scenario shell scripts equivalent to `saga-pattern-poc/platform-test/scripts/e2e-*.sh`.
 - A shared library between this repo and `saga-pattern-poc`, if the duplicated domain code turns out to be worth deduplicating once both implementations are further along.

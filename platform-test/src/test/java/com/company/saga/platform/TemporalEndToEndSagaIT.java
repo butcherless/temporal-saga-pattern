@@ -1,6 +1,10 @@
 package com.company.saga.platform;
 
+import com.company.saga.inventory.service.InventoryProgressionService;
+import com.company.saga.order.service.OrderProgressionService;
+import com.company.saga.payment.service.PaymentProgressionService;
 import io.temporal.client.WorkflowClient;
+import io.temporal.client.WorkflowFailedException;
 import io.temporal.client.WorkflowStub;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.serviceclient.WorkflowServiceStubsOptions;
@@ -14,6 +18,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.MountableFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -24,13 +29,16 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * End-to-end Testcontainers-Postgres + Temporal dev server IT — the Temporal analogue of
@@ -47,12 +55,22 @@ import static org.assertj.core.api.Assertions.assertThat;
  * setup than {@code docker-compose.yml}'s production-style {@code temporalio/server} + admin-tools
  * + Postgres, appropriate for a test that tears the whole environment down afterward anyway.
  *
- * <p>Drives one full happy-path saga — {@code POST /orders} on {@code order-service} — then
- * asserts on <b>both</b> the Workflow Execution itself (closes as {@code COMPLETED}, checked via
- * a {@link WorkflowClient} pointed at the same dev server) <b>and</b> the business outcome
- * ({@code customer_order.status} reaches {@code CONFIRMED} in {@code order_db}, same as the
- * custom implementation's own assertion). Retry/backoff, compensation, and the rest of the
- * reference scenarios are explicitly deferred — see the project's docs for what's still future work.
+ * <p>Each test drives one full saga via {@code POST /orders} on {@code order-service}, then
+ * asserts on <b>both</b> the Workflow Execution itself (checked via a {@link WorkflowClient}
+ * pointed at the same dev server) <b>and</b> the business outcome in {@code order_db}: the happy
+ * path ({@code COMPLETED}/{@code CONFIRMED}), proposal §17.3's two temporary-fault scenarios which
+ * recover via {@code OrderSagaWorkflowImpl}'s bounded {@code RetryOptions} (same
+ * {@code COMPLETED}/{@code CONFIRMED} outcome), its two permanent-fault scenarios, which fail
+ * the Workflow immediately — via the non-retryable classification in
+ * {@code InventoryActivitiesImpl}/{@code PaymentActivitiesImpl} — cancelling the order via
+ * {@code OrderActivities.cancelOrder} so it reaches {@code CANCELLED} instead of staying
+ * {@code PENDING}, its duplicate-submission scenario, where a repeat {@code POST /orders} for
+ * the same businessKey is a no-op instead of a second saga, and its three compensation scenarios
+ * (release-fails, refund-fails, and full rollback), driven by {@code OrderSagaWorkflowImpl}'s
+ * {@link io.temporal.workflow.Saga}-based compensation and checked against
+ * {@code inventory_db}/{@code payment_db} directly, not just the Workflow's own outcome. The rest
+ * of the reference scenarios are explicitly deferred — see the project's docs for what's still
+ * future work.
  */
 @Testcontainers(disabledWithoutDocker = true)
 class TemporalEndToEndSagaIT {
@@ -105,22 +123,164 @@ class TemporalEndToEndSagaIT {
 
     @Test
     void postOrdersDrivesTheFullHappyPathSagaToCompleted() throws Exception {
-        final String businessKey = "ORDER-2026-E2E-" + UUID.randomUUID();
+        postOrderAndAwaitConfirmed("SKU-001", 2, "49.99");
+    }
+
+    /**
+     * Proposal §17.3's temporary-inventory-fault scenario: {@code InventoryProgressionService}
+     * throws {@code TemporarySagaException} on the very first reservation of this SKU, then
+     * succeeds — this asserts {@code OrderSagaWorkflowImpl}'s {@code RetryOptions} recovers from
+     * it over real HTTP, without the saga ever leaving its normal (non-compensating) path.
+     */
+    @Test
+    void postOrdersRetriesATemporaryInventoryFaultAndStillCompletes() throws Exception {
+        postOrderAndAwaitConfirmed(InventoryProgressionService.FLAKY_RESERVE_SKU, 2, "49.99");
+    }
+
+    /**
+     * Proposal §17.3's temporary-payment-fault scenario: an amount at or above
+     * {@code FLAKY_THRESHOLD} (but below {@code HARD_DECLINE_THRESHOLD}) times out on the payment
+     * gateway's first attempt, then succeeds on retry.
+     */
+    @Test
+    void postOrdersRetriesATemporaryPaymentFaultAndStillCompletes() throws Exception {
+        assertThat(PaymentProgressionService.FLAKY_THRESHOLD)
+                .isLessThan(new BigDecimal("2000.00"))
+                .isLessThan(PaymentProgressionService.HARD_DECLINE_THRESHOLD);
+
+        postOrderAndAwaitConfirmed("SKU-001", 2, "2000.00");
+    }
+
+    /**
+     * Proposal §17.3's insufficient-stock scenario: {@code sku=SKU-001, quantity=999} exceeds the
+     * seeded stock of 100, a permanent business rejection — the Workflow must fail on the very
+     * first attempt (no retry) instead of exhausting {@code OrderSagaWorkflowImpl}'s bounded
+     * {@code RetryOptions} — the order ends up {@code CANCELLED}, not left dangling at
+     * {@code PENDING}.
+     */
+    @Test
+    void postOrdersFailsFastOnAPermanentInventoryFailure() throws Exception {
+        postOrderAndAwaitFailed("SKU-001", 999, "49.99");
+    }
+
+    /**
+     * Proposal §17.3's hard-decline scenario: an amount at or above {@code HARD_DECLINE_THRESHOLD}
+     * is declined outright by the payment gateway, a permanent business rejection.
+     */
+    @Test
+    void postOrdersFailsFastOnAPermanentPaymentDecline() throws Exception {
+        assertThat(new BigDecimal("15000.00")).isGreaterThanOrEqualTo(PaymentProgressionService.HARD_DECLINE_THRESHOLD);
+
+        postOrderAndAwaitFailed("SKU-001", 2, "15000.00");
+    }
+
+    /**
+     * Proposal §17.3 scenario 6: stock reserved for {@code PERMANENT_RELEASE_FAILURE_SKU}, then a
+     * hard-decline amount fails payment permanently. Compensation tries to release that
+     * reservation, and the release itself is the one that fails irrecoverably — the reservation
+     * stays {@code RESERVED} instead of {@code RELEASED}.
+     */
+    @Test
+    void postOrdersFailsToReleaseStockAfterAPermanentPaymentDecline() throws Exception {
+        assertThat(new BigDecimal("15000.00")).isGreaterThanOrEqualTo(PaymentProgressionService.HARD_DECLINE_THRESHOLD);
+
+        final String businessKey = postOrder(InventoryProgressionService.PERMANENT_RELEASE_FAILURE_SKU, 2, "15000.00");
+        final UUID sagaId = loadSagaId(businessKey);
+
+        awaitWorkflowFailed(businessKey);
+        assertOrderStatus(businessKey, "CANCELLED");
+        assertReservationStatus(sagaId, "RESERVED");
+    }
+
+    /**
+     * Proposal §17.3 scenario 7: payment completes for {@code PERMANENT_REFUND_FAILURE_AMOUNT},
+     * then order confirmation fails permanently. Compensation releases the stock successfully, but
+     * the refund itself fails irrecoverably — the payment stays {@code COMPLETED} instead of
+     * {@code REFUNDED}.
+     */
+    @Test
+    void postOrdersFailsToRefundAfterAPermanentOrderConfirmationFailure() throws Exception {
+        final String businessKey = "ORDER-2026-E2E-%s-%s".formatted(
+                OrderProgressionService.PERMANENT_CONFIRMATION_FAILURE_MARKER, UUID.randomUUID());
+        assertThat(postOrderWithBusinessKey(
+                businessKey, "SKU-001", 2, PaymentProgressionService.PERMANENT_REFUND_FAILURE_AMOUNT.toPlainString()))
+                .isEqualTo(202);
+        final UUID sagaId = loadSagaId(businessKey);
+
+        awaitWorkflowFailed(businessKey);
+        assertOrderStatus(businessKey, "CANCELLED");
+        assertReservationStatus(sagaId, "RELEASED");
+        assertPaymentStatus(sagaId, "COMPLETED");
+    }
+
+    /**
+     * Proposal §17.3 scenario 8: payment completes for a "safe" amount (below any payment fault
+     * threshold), then order confirmation fails permanently. Both compensations succeed —
+     * reservation {@code RELEASED}, payment {@code REFUNDED} — yet the saga still ends FAILED.
+     */
+    @Test
+    void postOrdersCompensatesFullyAfterAPermanentOrderConfirmationFailure() throws Exception {
+        final String businessKey = "ORDER-2026-E2E-%s-%s".formatted(
+                OrderProgressionService.PERMANENT_CONFIRMATION_FAILURE_MARKER, UUID.randomUUID());
+        assertThat(postOrderWithBusinessKey(businessKey, "SKU-001", 2, "250.00")).isEqualTo(202);
+        final UUID sagaId = loadSagaId(businessKey);
+
+        awaitWorkflowFailed(businessKey);
+        assertOrderStatus(businessKey, "CANCELLED");
+        assertReservationStatus(sagaId, "RELEASED");
+        assertPaymentStatus(sagaId, "REFUNDED");
+    }
+
+    private void postOrderAndAwaitConfirmed(final String sku, final int quantity, final String amount) throws Exception {
+        final String businessKey = postOrder(sku, quantity, amount);
+
+        awaitWorkflowCompleted(businessKey);
+        awaitOrderStatus(businessKey, "CONFIRMED");
+    }
+
+    private void postOrderAndAwaitFailed(final String sku, final int quantity, final String amount) throws Exception {
+        final String businessKey = postOrder(sku, quantity, amount);
+
+        awaitWorkflowFailed(businessKey);
+        assertOrderStatus(businessKey, "CANCELLED");
+    }
+
+    /**
+     * Proposal §17.3's duplicate-submission scenario: two sequential {@code POST /orders} for the
+     * same businessKey. The second is idempotent — {@code order-service}'s
+     * {@code OrderCreationHandler} finds the order the first call already created and skips
+     * starting a second Workflow Execution — so only one saga ever runs to completion.
+     */
+    @Test
+    void postOrdersIsIdempotentOnADuplicateBusinessKey() throws Exception {
+        final String businessKey = "ORDER-2026-E2E-%s".formatted(UUID.randomUUID());
+
+        assertThat(postOrderWithBusinessKey(businessKey, "SKU-001", 2, "49.99")).isEqualTo(202);
+        assertThat(postOrderWithBusinessKey(businessKey, "SKU-001", 2, "49.99")).isEqualTo(202);
+
+        awaitWorkflowCompleted(businessKey);
+        awaitOrderStatus(businessKey, "CONFIRMED");
+    }
+
+    private String postOrder(final String sku, final int quantity, final String amount) throws Exception {
+        final String businessKey = "ORDER-2026-E2E-%s".formatted(UUID.randomUUID());
+        assertThat(postOrderWithBusinessKey(businessKey, sku, quantity, amount)).isEqualTo(202);
+        return businessKey;
+    }
+
+    private int postOrderWithBusinessKey(final String businessKey, final String sku, final int quantity, final String amount) throws Exception {
         final String requestBody = """
-                {"sku":"SKU-001","quantity":2,"amount":49.99,"businessKey":"%s"}""".formatted(businessKey);
+                {"sku":"%s","quantity":%d,"amount":%s,"businessKey":"%s"}""".formatted(sku, quantity, amount, businessKey);
 
         final HttpClient client = HttpClient.newHttpClient();
         final HttpResponse<String> response = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + ORDER_SERVICE_PORT + "/orders"))
+                HttpRequest.newBuilder(URI.create("http://localhost:%d/orders".formatted(ORDER_SERVICE_PORT)))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
 
-        assertThat(response.statusCode()).isEqualTo(202);
-
-        awaitWorkflowCompleted(businessKey);
-        awaitOrderStatus(businessKey, "CONFIRMED");
+        return response.statusCode();
     }
 
     private static Process startOrchestrator(final Path logDir) throws IOException {
@@ -160,7 +320,7 @@ class TemporalEndToEndSagaIT {
         while (Instant.now().isBefore(deadline)) {
             try {
                 final HttpResponse<String> response = client.send(
-                        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/actuator/health")).GET().build(),
+                        HttpRequest.newBuilder(URI.create("http://localhost:%d/actuator/health".formatted(port))).GET().build(),
                         HttpResponse.BodyHandlers.ofString());
                 if (response.statusCode() == 200 && response.body().contains("\"UP\"")) {
                     return;
@@ -170,7 +330,7 @@ class TemporalEndToEndSagaIT {
             }
             Thread.sleep(POLL_INTERVAL.toMillis());
         }
-        throw new IllegalStateException("Service on port " + port + " did not become healthy within " + HEALTH_TIMEOUT);
+        throw new IllegalStateException("Service on port %d did not become healthy within %s".formatted(port, HEALTH_TIMEOUT));
     }
 
     private static void awaitWorkflowCompleted(final String businessKey) {
@@ -182,33 +342,94 @@ class TemporalEndToEndSagaIT {
             workflowStub.getResult(SAGA_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS, Void.class);
         } catch (final Exception error) {
             throw new AssertionError(
-                    "Order saga Workflow for businessKey " + businessKey + " did not complete within " + SAGA_TIMEOUT, error);
+                    "Order saga Workflow for businessKey %s did not complete within %s".formatted(businessKey, SAGA_TIMEOUT), error);
         } finally {
             serviceStubs.shutdownNow();
         }
     }
 
+    private static void awaitWorkflowFailed(final String businessKey) {
+        final WorkflowServiceStubs serviceStubs = WorkflowServiceStubs.newServiceStubs(
+                WorkflowServiceStubsOptions.newBuilder().setTarget(temporalTarget()).build());
+        try {
+            final WorkflowClient workflowClient = WorkflowClient.newInstance(serviceStubs);
+            final WorkflowStub workflowStub = workflowClient.newUntypedWorkflowStub(businessKey);
+            assertThatThrownBy(() -> workflowStub.getResult(SAGA_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS, Void.class))
+                    .isInstanceOf(WorkflowFailedException.class);
+        } finally {
+            serviceStubs.shutdownNow();
+        }
+    }
+
+    private static UUID loadSagaId(final String businessKey) throws SQLException {
+        return queryOne("order_db", "SELECT id FROM customer_order WHERE business_key = ?", businessKey,
+                resultSet -> (UUID) resultSet.getObject("id"));
+    }
+
+    private static void assertReservationStatus(final UUID sagaId, final String expectedStatus) throws SQLException {
+        final String status = queryOne("inventory_db", "SELECT status FROM inventory_reservation WHERE id = ?", sagaId,
+                resultSet -> resultSet.getString("status"));
+        assertThat(status).isEqualTo(expectedStatus);
+    }
+
+    private static void assertPaymentStatus(final UUID sagaId, final String expectedStatus) throws SQLException {
+        final String status = queryOne("payment_db", "SELECT status FROM payment WHERE id = ?", sagaId,
+                resultSet -> resultSet.getString("status"));
+        assertThat(status).isEqualTo(expectedStatus);
+    }
+
+    private static void assertOrderStatus(final String businessKey, final String expectedStatus) throws SQLException {
+        final String status = queryOne("order_db", "SELECT status FROM customer_order WHERE business_key = ?", businessKey,
+                resultSet -> resultSet.getString("status"));
+        assertThat(status).isEqualTo(expectedStatus);
+    }
+
     private static void awaitOrderStatus(final String businessKey, final String expectedStatus) throws Exception {
-        final String jdbcUrl = "jdbc:postgresql://" + POSTGRES.getHost() + ":" + POSTGRES.getMappedPort(5432) + "/order_db";
         final Instant deadline = Instant.now().plus(SAGA_TIMEOUT);
         String lastSeenStatus = null;
 
         while (Instant.now().isBefore(deadline)) {
-            try (Connection connection = DriverManager.getConnection(jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword());
-                    PreparedStatement statement = connection.prepareStatement("SELECT status FROM customer_order WHERE business_key = ?")) {
-                statement.setString(1, businessKey);
-                try (ResultSet resultSet = statement.executeQuery()) {
-                    if (resultSet.next()) {
-                        lastSeenStatus = resultSet.getString("status");
-                        if (expectedStatus.equals(lastSeenStatus)) {
-                            return;
-                        }
-                    }
+            final Optional<String> status = queryOptional(
+                    "order_db", "SELECT status FROM customer_order WHERE business_key = ?", businessKey,
+                    resultSet -> resultSet.getString("status"));
+            if (status.isPresent()) {
+                lastSeenStatus = status.get();
+                if (expectedStatus.equals(lastSeenStatus)) {
+                    return;
                 }
             }
             Thread.sleep(POLL_INTERVAL.toMillis());
         }
-        throw new AssertionError("Order for businessKey " + businessKey + " did not reach " + expectedStatus
-                + " within " + SAGA_TIMEOUT + " (last seen status: " + lastSeenStatus + ")");
+        throw new AssertionError("Order for businessKey %s did not reach %s within %s (last seen status: %s)"
+                .formatted(businessKey, expectedStatus, SAGA_TIMEOUT, lastSeenStatus));
+    }
+
+    /**
+     * Shared single-row/single-column query plumbing behind {@code loadSagaId}/{@code assert*Status}/
+     * {@code awaitOrderStatus} — each of the three Testcontainers-Postgres databases only ever needs
+     * a one-parameter {@code SELECT} by id or business key, so the connection/statement/result-set
+     * lifecycle lives here once instead of once per accessor.
+     */
+    private static <T> T queryOne(final String database, final String sql, final Object param, final ResultSetExtractor<T> extractor)
+            throws SQLException {
+        return queryOptional(database, sql, param, extractor)
+                .orElseThrow(() -> new AssertionError("Query returned no row: %s".formatted(sql)));
+    }
+
+    private static <T> Optional<T> queryOptional(
+            final String database, final String sql, final Object param, final ResultSetExtractor<T> extractor) throws SQLException {
+        final String jdbcUrl = "jdbc:postgresql://%s:%d/%s".formatted(POSTGRES.getHost(), POSTGRES.getMappedPort(5432), database);
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword());
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setObject(1, param);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? Optional.of(extractor.extract(resultSet)) : Optional.empty();
+            }
+        }
+    }
+
+    @FunctionalInterface
+    private interface ResultSetExtractor<T> {
+        T extract(ResultSet resultSet) throws SQLException;
     }
 }

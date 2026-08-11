@@ -15,7 +15,7 @@
 | Business relationship | Dependent: charge payment needs stock reserved; confirm order/reservation need payment's outcome | Independent: airline/hotel/car bookings share no data dependency |
 | Workflow code shape | Sequential activity-stub calls, each blocking the Workflow Task until it resolves before the next command is issued | `Async.procedure(...)` fan-out issuing all 3 Activity commands within the same Workflow Task, then `Promise.allOf(...).get()` fan-in |
 | Failure blast radius | A failure at step N means steps N+1..4 are never attempted | A failure in one leg doesn't prevent the other two from having already been dispatched — by the time the Workflow observes the failure, 0, 1, or 2 of the other legs may already have succeeded |
-| Compensation shape (future) | A natural LIFO stack via `io.temporal.workflow.Saga`, since steps are already ordered | Not a clean LIFO stack — the legs needing undoing are whichever concurrent Activities actually succeeded, in no particular order. A materially different design problem, not just "the same thing, not built yet" — see §6 |
+| Compensation shape | A natural LIFO stack via `io.temporal.workflow.Saga`, since steps are already ordered (implemented — see `OrderSagaWorkflowImpl`) | Not a clean LIFO stack — the legs needing undoing are whichever concurrent Activities actually succeeded, in no particular order. A materially different design problem, not just "the same thing, differently ordered" — see §6 |
 | Task queue / Worker | Single Task Queue, single Worker | Same pattern, renamed |
 
 ### What stays identical

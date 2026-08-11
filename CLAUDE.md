@@ -31,6 +31,22 @@ There is no `saga-orchestrator` module, no `SagaStatus` state machine, no `saga_
 
 Same Java 25 toolchain, `./mvnw` wrapper, and static-analysis command as `saga-pattern-poc` — see that repo's `CLAUDE.md` for the exact invocations. `./mvnw clean verify` needs Docker for `platform-test`'s IT; there's no other Testcontainers-backed IT yet in this repo (no messaging config to test against a real broker).
 
+### Applying the `final` convention (OpenRewrite, ad hoc)
+
+The `final` conventions above (method arguments, plus local variables and private fields) aren't wired into any `pom.xml` — no `rewrite-maven-plugin` is configured in this repo. Apply them on demand via the `rewrite-maven-plugin`'s `run` goal against `org.openrewrite.recipe:rewrite-static-analysis`, without adding the plugin to any build file:
+
+```bash
+mvn -U org.openrewrite.maven:rewrite-maven-plugin:run \
+  -Drewrite.recipeArtifactCoordinates=org.openrewrite.recipe:rewrite-static-analysis:LATEST \
+  -Drewrite.activeRecipes=org.openrewrite.staticanalysis.FinalizeLocalVariables,org.openrewrite.staticanalysis.FinalizeMethodArguments,org.openrewrite.staticanalysis.FinalizePrivateFields
+```
+
+- `org.openrewrite.staticanalysis.FinalizeLocalVariables` — adds `final` to local variables that are never reassigned (skips uninitialized declarations and for-loop control variables).
+- `org.openrewrite.staticanalysis.FinalizeMethodArguments` — adds `final` to method parameters.
+- `org.openrewrite.staticanalysis.FinalizePrivateFields` — adds `final` to private instance fields that are initialized and never reassigned.
+
+Requires the active JDK to satisfy this repo's Maven Enforcer `RequireJavaVersion` rule (`[25,)`); if the shell's default JDK is older (e.g. via `sdk use java` set to 21), override just for this command: `export JAVA_HOME=~/.sdkman/candidates/java/25.0.3-zulu` (or whatever Java 25 SDKMAN candidate is installed) before running `mvn`. Review the diff before committing — this rewrites working-tree files directly.
+
 ### Local infra (PostgreSQL + Temporal)
 
 ```bash

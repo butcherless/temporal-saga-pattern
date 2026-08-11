@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
@@ -44,7 +45,7 @@ class OrderCreationHandlerTest {
     @BeforeEach
     void setUp() {
         testEnv = TestWorkflowEnvironment.newInstance();
-        handler = new OrderCreationHandler(orderProgressionService, testEnv.getWorkflowClient());
+        handler = new OrderCreationHandler(orderProgressionService, testEnv.getWorkflowClient(), Schedulers.immediate());
     }
 
     @AfterEach
@@ -96,7 +97,8 @@ class OrderCreationHandlerTest {
     @Test
     void createOrderSkipsStartingTheWorkflowWhenTheOrderAlreadyExisted() {
         final WorkflowClient mockWorkflowClient = mock(WorkflowClient.class);
-        final OrderCreationHandler handlerWithMockClient = new OrderCreationHandler(orderProgressionService, mockWorkflowClient);
+        final OrderCreationHandler handlerWithMockClient =
+                new OrderCreationHandler(orderProgressionService, mockWorkflowClient, Schedulers.immediate());
 
         final CreateOrderRequestBody request = new CreateOrderRequestBody("SKU-001", 5, new BigDecimal("49.99"), "ORDER-2026-700002");
         final CustomerOrder preExistingOrder = CustomerOrder.create(UUID.randomUUID(), "ORDER-2026-700002", Instant.now());

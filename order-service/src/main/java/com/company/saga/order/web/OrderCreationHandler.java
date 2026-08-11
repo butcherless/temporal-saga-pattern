@@ -11,7 +11,7 @@ import io.temporal.client.WorkflowExecutionAlreadyStarted;
 import io.temporal.client.WorkflowOptions;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import reactor.core.scheduler.Scheduler;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -29,10 +29,15 @@ public class OrderCreationHandler {
 
     private final OrderProgressionService orderProgressionService;
     private final WorkflowClient workflowClient;
+    private final Scheduler blockingCallScheduler;
 
-    public OrderCreationHandler(final OrderProgressionService orderProgressionService, final WorkflowClient workflowClient) {
+    public OrderCreationHandler(
+            final OrderProgressionService orderProgressionService,
+            final WorkflowClient workflowClient,
+            final Scheduler blockingCallScheduler) {
         this.orderProgressionService = Objects.requireNonNull(orderProgressionService, "orderProgressionService must not be null");
         this.workflowClient = Objects.requireNonNull(workflowClient, "workflowClient must not be null");
+        this.blockingCallScheduler = Objects.requireNonNull(blockingCallScheduler, "blockingCallScheduler must not be null");
     }
 
     public Mono<CreateOrderResponseBody> createOrder(final CreateOrderRequestBody request) {
@@ -69,7 +74,7 @@ public class OrderCreationHandler {
 
         // WorkflowClient.start is a blocking gRPC call; run it off the WebFlux event loop.
         return Mono.fromRunnable(() -> WorkflowClient.start(workflow::process, input))
-                .subscribeOn(Schedulers.boundedElastic())
+                .subscribeOn(blockingCallScheduler)
                 .onErrorResume(WorkflowExecutionAlreadyStarted.class, error -> Mono.empty())
                 .then();
     }

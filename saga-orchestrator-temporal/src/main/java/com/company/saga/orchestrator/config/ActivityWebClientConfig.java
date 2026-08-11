@@ -1,6 +1,6 @@
 package com.company.saga.orchestrator.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -9,7 +9,8 @@ import org.springframework.web.reactive.function.client.WebClient;
  * One {@link WebClient} per business service, each pointed at that service's own base URL —
  * disambiguated by bean name (the project's own convention where autowiring-by-parameter-name
  * isn't available; see {@code order-service}'s {@code transactionalOperator}/nested-transaction
- * beans for the same pattern).
+ * beans for the same pattern). Base URLs come from {@link ServicesProperties}, one typed
+ * {@code @ConfigurationProperties} bean instead of three independent {@code @Value} placeholders.
  *
  * <p>Built from the injected, auto-configured {@link WebClient.Builder} — not the static
  * {@link WebClient#create(String)} factory, which bypasses auto-configuration and every
@@ -22,22 +23,21 @@ import org.springframework.web.reactive.function.client.WebClient;
  * settings), applied here the same way for the same reason.
  */
 @Configuration
+@EnableConfigurationProperties(ServicesProperties.class)
 public class ActivityWebClientConfig {
 
     @Bean
-    public WebClient orderWebClient(final WebClient.Builder webClientBuilder, @Value("${services.order.base-url}") final String baseUrl) {
-        return webClientBuilder.baseUrl(baseUrl).build();
+    public WebClient orderWebClient(final WebClient.Builder webClientBuilder, final ServicesProperties servicesProperties) {
+        return webClientBuilder.baseUrl(servicesProperties.order().baseUrl()).build();
     }
 
     @Bean
-    public WebClient inventoryWebClient(
-            final WebClient.Builder webClientBuilder, @Value("${services.inventory.base-url}") final String baseUrl) {
-        return webClientBuilder.baseUrl(baseUrl).build();
+    public WebClient inventoryWebClient(final WebClient.Builder webClientBuilder, final ServicesProperties servicesProperties) {
+        return webClientBuilder.baseUrl(servicesProperties.inventory().baseUrl()).build();
     }
 
     @Bean
-    public WebClient paymentWebClient(
-            final WebClient.Builder webClientBuilder, @Value("${services.payment.base-url}") final String baseUrl) {
-        return webClientBuilder.baseUrl(baseUrl).build();
+    public WebClient paymentWebClient(final WebClient.Builder webClientBuilder, final ServicesProperties servicesProperties) {
+        return webClientBuilder.baseUrl(servicesProperties.payment().baseUrl()).build();
     }
 }

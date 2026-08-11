@@ -4,6 +4,16 @@ server:
 spring:
   application:
     name: saga-orchestrator-temporal
+  # Socket-level timeouts for every auto-configured HTTP client (the three business-service
+  # WebClients built in ActivityWebClientConfig) — previously there was none at all except
+  # OrderSagaWorkflowImpl's ActivityOptions#setStartToCloseTimeout(10s), a workflow-level guard,
+  # not a socket-level one: a hung TCP connection was indistinguishable from a slow business
+  # service until that 10s elapsed. read-timeout stays comfortably under that 10s so a stalled
+  # response fails at the HTTP client first, with a clearer error than a bare Activity timeout.
+  http:
+    clients:
+      connect-timeout: 2s
+      read-timeout: 5s
   temporal:
     connection:
       target: ${TEMPORAL_TARGET:localhost:7233}

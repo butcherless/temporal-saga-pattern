@@ -29,12 +29,20 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- WebClient (Activities call the business services' REST endpoints) + a reactive
-             server, kept only so /actuator/health is reachable the same way as every other
-             service — this module has no @RestController of its own. -->
+        <!-- A reactive server, kept only so /actuator/health is reachable the same way as every
+             other service — this module has no @RestController of its own. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- WebClient (Activities call the business services' REST endpoints), auto-configured:
+             Spring Boot 4 split WebClientAutoConfiguration (the auto-configured WebClient.Builder
+             bean + WebClientCustomizer wiring — tracing/metrics instrumentation among them) into
+             its own module, no longer pulled in transitively by spring-boot-starter-webflux. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webclient</artifactId>
         </dependency>
 
         <!-- Registers the Worker (WorkflowClient + WorkerFactory) from spring.temporal.* config;

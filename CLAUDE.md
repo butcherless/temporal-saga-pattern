@@ -47,21 +47,26 @@ mvn -U org.openrewrite.maven:rewrite-maven-plugin:run \
 
 Requires the active JDK to satisfy this repo's Maven Enforcer `RequireJavaVersion` rule (`[25,)`); if the shell's default JDK is older (e.g. via `sdk use java` set to 21), override just for this command: `export JAVA_HOME=~/.sdkman/candidates/java/25.0.3-zulu` (or whatever Java 25 SDKMAN candidate is installed) before running `mvn`. Review the diff before committing — this rewrites working-tree files directly.
 
-### One parameter per line (custom OpenRewrite recipe, ad hoc)
+### One element per line (custom OpenRewrite recipes, ad hoc)
 
-No published recipe forces every method/constructor parameter onto its own line unconditionally (the stock formatters — `google-java-format`, `palantir-java-format`, OpenRewrite's `WrappingAndBraces` — only wrap when a line exceeds the column limit). `tooling/openrewrite-one-param-per-line/` is a small standalone recipe module — `com.company.tooling.OneParameterPerLine` — that does this precisely: for any `J.MethodDeclaration` (covers constructors too) with 2+ parameters, it puts every parameter after the first on its own line, indented one continuation level (8 spaces) past the declaration; the first parameter, comments, single/no-parameter declarations, and everything else in the file are left untouched.
+No published recipe forces every method/constructor parameter, or every record component, onto its own line unconditionally (the stock formatters — `google-java-format`, `palantir-java-format`, OpenRewrite's `WrappingAndBraces` — only wrap when a line exceeds the column limit). `tooling/openrewrite-one-param-per-line/` is a small standalone recipe module hosting two recipes that do this precisely, plus the `OnePerLineSupport` helper they both delegate to (identical whitespace logic, applied to a different padded element list):
 
-It's deliberately **not** listed in the root `pom.xml`'s `<modules>` — same "not wired into the build" posture as the `final` recipes above. Install it to the local repo once (or after editing its source), then run it against this repo the same way as any published recipe:
+- `com.company.tooling.OneParameterPerLine` — for any `J.MethodDeclaration` (covers constructors too) with 2+ parameters, puts every parameter after the first on its own line.
+- `com.company.tooling.OneRecordComponentPerLine` — for any record's `J.ClassDeclaration` (`getKind() == Record`) with 2+ components, puts every component after the first on its own line; non-record classes/interfaces/enums are untouched.
+
+Both indent one continuation level (8 spaces) past the declaration; the first element, comments, single/no-element declarations, and everything else in the file are left untouched.
+
+The module is deliberately **not** listed in the root `pom.xml`'s `<modules>` — same "not wired into the build" posture as the `final` recipes above. Install it to the local repo once (or after editing its source), then run either or both recipes against this repo the same way as any published recipe:
 
 ```bash
 cd tooling/openrewrite-one-param-per-line && mvn install && cd ../..
 
 mvn -U org.openrewrite.maven:rewrite-maven-plugin:run \
   -Drewrite.recipeArtifactCoordinates=com.company.tooling:openrewrite-one-param-per-line:1.0.0-SNAPSHOT \
-  -Drewrite.activeRecipes=com.company.tooling.OneParameterPerLine
+  -Drewrite.activeRecipes=com.company.tooling.OneParameterPerLine,com.company.tooling.OneRecordComponentPerLine
 ```
 
-Same Java 25 `JAVA_HOME` requirement as above. An Eclipse-JDT-based alternative was tried first (`formatter-maven-plugin`/Spotless with a custom formatter profile) and rejected: any setting left unset in the profile falls back to Eclipse's own defaults, which reflowed every Javadoc comment and collapsed enum constants onto one line — far beyond the intended scope. The custom recipe avoids that because its visitor only ever touches parameter-list whitespace.
+Same Java 25 `JAVA_HOME` requirement as above. An Eclipse-JDT-based alternative was tried first (`formatter-maven-plugin`/Spotless with a custom formatter profile) and rejected: any setting left unset in the profile falls back to Eclipse's own defaults, which reflowed every Javadoc comment and collapsed enum constants onto one line — far beyond the intended scope. These custom recipes avoid that because their visitors only ever touch parameter-list/record-component whitespace.
 
 ### Local infra (PostgreSQL + Temporal)
 

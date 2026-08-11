@@ -45,7 +45,7 @@
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
         <!-- Not managed by the Spring Boot BOM; only modules with Testcontainers-based
              integration tests (*IT.java) bind this plugin explicitly. -->
-        <maven-failsafe-plugin.version>3.5.5</maven-failsafe-plugin.version>
+        <maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
         <!-- 0.8.15 is the first release with official (not experimental) Java 25 class-file support. -->
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
     </properties>

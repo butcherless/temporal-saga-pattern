@@ -6,7 +6,9 @@ import java.util.Objects;
 import java.util.UUID;
 
 /** Input to {@link PaymentProgressionService#requestPayment(RequestPaymentRequest)}. */
-public record RequestPaymentRequest(UUID sagaId, BigDecimal amount, Instant now) {
+public record RequestPaymentRequest(UUID sagaId,
+        BigDecimal amount,
+        Instant now) {
 
     public RequestPaymentRequest {
         Objects.requireNonNull(sagaId, "sagaId must not be null");

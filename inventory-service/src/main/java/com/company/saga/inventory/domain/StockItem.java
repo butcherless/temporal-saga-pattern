@@ -14,7 +14,9 @@ import java.util.Objects;
  * so {@link Version optimistic locking} is what keeps concurrent reservations safe.
  */
 @Table("stock_item")
-public record StockItem(@Id String sku, int availableQuantity, @Version Long version) {
+public record StockItem(@Id String sku,
+        int availableQuantity,
+        @Version Long version) {
 
     public StockItem {
         Objects.requireNonNull(sku, "sku must not be null");

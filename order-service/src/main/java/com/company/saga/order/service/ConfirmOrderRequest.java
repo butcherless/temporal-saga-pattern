@@ -5,7 +5,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /** Input to {@link OrderProgressionService#confirmOrder(ConfirmOrderRequest)}. */
-public record ConfirmOrderRequest(UUID sagaId, Instant now) {
+public record ConfirmOrderRequest(UUID sagaId,
+        Instant now) {
 
     public ConfirmOrderRequest {
         Objects.requireNonNull(sagaId, "sagaId must not be null");

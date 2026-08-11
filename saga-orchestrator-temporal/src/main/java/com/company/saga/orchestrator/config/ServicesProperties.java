@@ -11,7 +11,9 @@ import java.util.Objects;
  * unrelated string lookups each failing (or silently defaulting) on their own.
  */
 @ConfigurationProperties(prefix = "services")
-public record ServicesProperties(Service order, Service inventory, Service payment) {
+public record ServicesProperties(Service order,
+        Service inventory,
+        Service payment) {
 
     public ServicesProperties {
         Objects.requireNonNull(order, "order must not be null");

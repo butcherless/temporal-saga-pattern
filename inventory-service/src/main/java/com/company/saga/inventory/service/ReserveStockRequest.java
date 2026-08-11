@@ -5,7 +5,10 @@ import java.util.Objects;
 import java.util.UUID;
 
 /** Input to {@link InventoryProgressionService#reserveStock(ReserveStockRequest)}. */
-public record ReserveStockRequest(UUID sagaId, String sku, Integer quantity, Instant now) {
+public record ReserveStockRequest(UUID sagaId,
+        String sku,
+        Integer quantity,
+        Instant now) {
 
     public ReserveStockRequest {
         Objects.requireNonNull(sagaId, "sagaId must not be null");

@@ -8,5 +8,9 @@ import java.util.UUID;
  * carries through the saga (stock item, quantity, amount to charge), plus the identifiers used
  * for idempotency (`sagaId` as the Workflow Id, `businessKey` for the originating order).
  */
-public record OrderSagaInput(UUID sagaId, String businessKey, String sku, Integer quantity, BigDecimal amount) {
+public record OrderSagaInput(UUID sagaId,
+        String businessKey,
+        String sku,
+        Integer quantity,
+        BigDecimal amount) {
 }

@@ -1,6 +1,7 @@
 package com.company.saga.order.web;
 
 import com.company.saga.order.domain.CustomerOrder;
+import com.company.saga.order.domain.IllegalOrderTransitionException;
 import com.company.saga.order.domain.OrderStatus;
 import com.company.saga.order.service.OrderProgressionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,7 +32,9 @@ class OrderControllerTest {
 
     @BeforeEach
     void setUp() {
-        client = WebTestClient.bindToController(new OrderController(orderCreationHandler, orderProgressionService)).build();
+        client = WebTestClient.bindToController(new OrderController(orderCreationHandler, orderProgressionService))
+                .controllerAdvice(new RestExceptionHandler())
+                .build();
     }
 
     @Test
@@ -52,11 +55,7 @@ class OrderControllerTest {
 
     @Test
     void createOrderRejectsAnInvalidRequestBodyWithAProblemDetail() {
-        final WebTestClient clientWithProblemDetailHandling = WebTestClient.bindToController(new OrderController(orderCreationHandler, orderProgressionService))
-                .controllerAdvice(new RestExceptionHandler())
-                .build();
-
-        clientWithProblemDetailHandling.post().uri("/orders")
+        client.post().uri("/orders")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sku":"SKU-001","quantity":-1,"amount":49.99}""")
@@ -94,5 +93,38 @@ class OrderControllerTest {
                 .expectBody()
                 .jsonPath("$.sagaId").isEqualTo(sagaId.toString())
                 .jsonPath("$.status").isEqualTo(OrderStatus.CANCELLED.name());
+    }
+
+    /**
+     * {@link IllegalOrderTransitionException} extends plain {@code IllegalStateException}, not
+     * {@code SagaException} (an internal invariant violation, not a classified business error —
+     * see the exception's own javadoc), and {@code RestExceptionHandler} deliberately doesn't map
+     * it: it's meant to surface as an unhandled 500, not a shaped {@code ProblemDetail}.
+     */
+    @Test
+    void confirmOrderReturns500WhenTheOrderCannotLegallyBeConfirmed() {
+        final UUID sagaId = UUID.randomUUID();
+        when(orderProgressionService.confirmOrder(any()))
+                .thenReturn(Mono.error(new IllegalOrderTransitionException(OrderStatus.CANCELLED, OrderStatus.CONFIRMED)));
+
+        client.post().uri("/orders/{sagaId}/confirm", sagaId)
+                .exchange()
+                .expectStatus().is5xxServerError();
+    }
+
+    /**
+     * Same reasoning as {@link #confirmOrderReturns500WhenTheOrderCannotLegallyBeConfirmed} —
+     * cancelling an already-{@code CONFIRMED} order (proposal §9.3's {@code PIVOT} rule) is an
+     * internal invariant violation, not a classified business error.
+     */
+    @Test
+    void cancelOrderReturns500WhenTheOrderCannotLegallyBeCancelled() {
+        final UUID sagaId = UUID.randomUUID();
+        when(orderProgressionService.cancelOrder(any()))
+                .thenReturn(Mono.error(new IllegalOrderTransitionException(OrderStatus.CONFIRMED, OrderStatus.CANCELLED)));
+
+        client.post().uri("/orders/{sagaId}/cancel", sagaId)
+                .exchange()
+                .expectStatus().is5xxServerError();
     }
 }

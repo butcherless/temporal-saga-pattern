@@ -2,6 +2,7 @@ package com.company.saga.inventory.web;
 
 import com.company.saga.common.error.PermanentSagaException;
 import com.company.saga.common.error.TemporarySagaException;
+import com.company.saga.inventory.domain.IllegalReservationTransitionException;
 import com.company.saga.inventory.domain.InventoryReservation;
 import com.company.saga.inventory.domain.ReservationStatus;
 import com.company.saga.inventory.service.InventoryProgressionService;
@@ -106,6 +107,23 @@ class InventoryControllerTest {
                 .expectBody()
                 .jsonPath("$.sagaId").isEqualTo(sagaId.toString())
                 .jsonPath("$.status").isEqualTo(ReservationStatus.CONFIRMED.name());
+    }
+
+    /**
+     * {@link IllegalReservationTransitionException} extends plain {@code IllegalStateException},
+     * not {@code SagaException} (an internal invariant violation, not a classified business error
+     * — see the exception's own javadoc), and {@code RestExceptionHandler} deliberately doesn't
+     * map it: it's meant to surface as an unhandled 500, not a shaped {@code ProblemDetail}.
+     */
+    @Test
+    void confirmReservationReturns500WhenTheReservationCannotLegallyBeConfirmed() {
+        final UUID sagaId = UUID.randomUUID();
+        when(inventoryProgressionService.confirmReservation(any()))
+                .thenReturn(Mono.error(new IllegalReservationTransitionException(ReservationStatus.RELEASED, ReservationStatus.CONFIRMED)));
+
+        client.post().uri("/inventory/reservations/{sagaId}/confirm", sagaId)
+                .exchange()
+                .expectStatus().is5xxServerError();
     }
 
     @Test

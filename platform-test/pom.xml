@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.company.saga</groupId>
+        <groupId>com.alpha.saga</groupId>
         <artifactId>distributed-saga-platform-temporal</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
@@ -20,7 +20,7 @@
         <!-- Brings in temporal-sdk transitively (WorkflowClient/WorkflowServiceStubs), used to
              assert the Workflow Execution itself closed as COMPLETED. -->
         <dependency>
-            <groupId>com.company.saga</groupId>
+            <groupId>com.alpha.saga</groupId>
             <artifactId>saga-common</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -30,25 +30,25 @@
              purely so Maven's reactor build order guarantees their jars already exist (built by
              the package phase) by the time this module's integration-test phase runs. -->
         <dependency>
-            <groupId>com.company.saga</groupId>
+            <groupId>com.alpha.saga</groupId>
             <artifactId>order-service</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.company.saga</groupId>
+            <groupId>com.alpha.saga</groupId>
             <artifactId>inventory-service</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.company.saga</groupId>
+            <groupId>com.alpha.saga</groupId>
             <artifactId>payment-service</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.company.saga</groupId>
+            <groupId>com.alpha.saga</groupId>
             <artifactId>saga-orchestrator-temporal</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>

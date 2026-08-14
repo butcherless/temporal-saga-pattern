@@ -20,7 +20,7 @@ spring:
     workers:
       - task-queue: order-saga-task-queue
         workflow-classes:
-          - com.company.saga.orchestrator.workflow.OrderSagaWorkflowImpl
+          - com.alpha.saga.orchestrator.workflow.OrderSagaWorkflowImpl
         activity-beans:
           - inventoryActivitiesImpl
           - paymentActivitiesImpl
@@ -65,7 +65,7 @@ spring:
 # append=false FileAppender.
 logging:
   level:
-    com.company.saga: DEBUG
+    com.alpha.saga: DEBUG
   file:
     name: /tmp/saga-orchestrator-temporal.log
   logback:

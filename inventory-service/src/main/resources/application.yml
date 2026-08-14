@@ -50,7 +50,7 @@ spring:
 # append=false FileAppender.
 logging:
   level:
-    com.company.saga: DEBUG
+    com.alpha.saga: DEBUG
   file:
     name: /tmp/inventory-service.log
   logback:

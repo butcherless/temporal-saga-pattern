@@ -33,7 +33,7 @@
 A new `saga-common` `workflow` package, analogous to `OrderSagaInput` but with per-service nested records — justified because, unlike `sku`/`quantity`/`amount` (flat, order-level scalars), airline/hotel/car have genuinely disjoint field sets; a flat record here would need field-name prefixes and obscure which fields belong to which downstream service.
 
 ```java
-package com.company.saga.common.workflow;
+package com.alpha.saga.common.workflow;
 
 public record HolidayPackageSagaInput(
         UUID sagaId,
@@ -83,7 +83,7 @@ Two alternatives were considered and rejected as premature for phase 1:
 ## 3. Workflow interface
 
 ```java
-package com.company.saga.common.workflow;
+package com.alpha.saga.common.workflow;
 
 @WorkflowInterface
 public interface HolidayPackageSagaWorkflow {
@@ -201,7 +201,7 @@ Not implemented yet — this section fixes the actual `pom.xml` shape closely en
 Same shape as this repo's root `pom.xml`, renamed:
 
 ```xml
-<groupId>com.company.saga</groupId>
+<groupId>com.alpha.saga</groupId>
 <artifactId>distributed-saga-platform-temporal-parallel</artifactId>
 <version>1.0.0-SNAPSHOT</version>
 <packaging>pom</packaging>
@@ -244,5 +244,5 @@ This draft fixes the core interfaces well enough to scaffold from, but a few thi
 1. **Booking field lists** — the fields above (flight number/route/date/passenger count; room type/dates/guest count; car category/pickup/dropoff) are a first pass at "realistic but simple." Revisit once the reservation services are actually being built, in case a field turns out to be unused or something's missing.
 2. **`Promise.allOf` partial-failure/cancellation semantics** — deliberately unpinned (§3, §6); needs a decision once compensation is designed.
 3. **Filename/location** — this doc currently lives at `docs/temporal-saga-parallel-plan.md` in `temporal-saga-pattern`; once `temporal-saga-pattern-parallel` exists as its own repo, decide whether this doc migrates there (as that repo's own `docs/temporal-saga-parallel-proposal.md`, analogous to `temporal-saga-proposal.md` here) or stays here as the originating design doc.
-4. **Root `groupId`/`artifactId` naming** — `com.company.saga:distributed-saga-platform-temporal-parallel` (§7) is a placeholder mirroring this repo's own root coordinates; confirm before scaffolding.
+4. **Root `groupId`/`artifactId` naming** — `com.alpha.saga:distributed-saga-platform-temporal-parallel` (§7) is a placeholder mirroring this repo's own root coordinates; confirm before scaffolding.
 5. **`resilience4j` in the leaf services** — carried over from `inventory-service`/`payment-service`'s POM shape (§7) but not actually wired into any retry logic in either repo yet; decide whether to include it upfront or drop it until it has a use.

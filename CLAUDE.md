@@ -53,8 +53,8 @@ Requires the active JDK to satisfy this repo's Maven Enforcer `RequireJavaVersio
 
 No published recipe forces every method/constructor parameter, or every record component, onto its own line unconditionally (the stock formatters — `google-java-format`, `palantir-java-format`, OpenRewrite's `WrappingAndBraces` — only wrap when a line exceeds the column limit). `tooling/openrewrite-one-param-per-line/` is a small standalone recipe module hosting two recipes that do this precisely, plus the `OnePerLineSupport` helper they both delegate to (identical whitespace logic, applied to a different padded element list):
 
-- `com.company.tooling.OneParameterPerLine` — for any `J.MethodDeclaration` (covers constructors too) with 2+ parameters, puts every parameter after the first on its own line.
-- `com.company.tooling.OneRecordComponentPerLine` — for any record's `J.ClassDeclaration` (`getKind() == Record`) with 2+ components, puts every component after the first on its own line; non-record classes/interfaces/enums are untouched.
+- `com.alpha.tooling.OneParameterPerLine` — for any `J.MethodDeclaration` (covers constructors too) with 2+ parameters, puts every parameter after the first on its own line.
+- `com.alpha.tooling.OneRecordComponentPerLine` — for any record's `J.ClassDeclaration` (`getKind() == Record`) with 2+ components, puts every component after the first on its own line; non-record classes/interfaces/enums are untouched.
 
 Both indent one continuation level (8 spaces) past the declaration; the first element, comments, single/no-element declarations, and everything else in the file are left untouched.
 
@@ -64,8 +64,8 @@ The module is deliberately **not** listed in the root `pom.xml`'s `<modules>` �
 cd tooling/openrewrite-one-param-per-line && mvn install && cd ../..
 
 mvn -U org.openrewrite.maven:rewrite-maven-plugin:run \
-  -Drewrite.recipeArtifactCoordinates=com.company.tooling:openrewrite-one-param-per-line:1.0.0-SNAPSHOT \
-  -Drewrite.activeRecipes=com.company.tooling.OneParameterPerLine,com.company.tooling.OneRecordComponentPerLine
+  -Drewrite.recipeArtifactCoordinates=com.alpha.tooling:openrewrite-one-param-per-line:1.0.0-SNAPSHOT \
+  -Drewrite.activeRecipes=com.alpha.tooling.OneParameterPerLine,com.alpha.tooling.OneRecordComponentPerLine
 ```
 
 Same Java 25 `JAVA_HOME` requirement as above. An Eclipse-JDT-based alternative was tried first (`formatter-maven-plugin`/Spotless with a custom formatter profile) and rejected: any setting left unset in the profile falls back to Eclipse's own defaults, which reflowed every Javadoc comment and collapsed enum constants onto one line — far beyond the intended scope. These custom recipes avoid that because their visitors only ever touch parameter-list/record-component whitespace.

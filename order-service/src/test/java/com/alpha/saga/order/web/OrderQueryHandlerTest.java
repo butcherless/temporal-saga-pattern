@@ -42,8 +42,8 @@ class OrderQueryHandlerTest {
 
     @AfterEach
     void tearDown() {
-        if (testEnv != null) {
-            testEnv.close();
+        if (this.testEnv != null) {
+            this.testEnv.close();
         }
     }
 
@@ -51,10 +51,10 @@ class OrderQueryHandlerTest {
     void getOrderStatusReturnsCompletedWithoutQueryingTheWorkflowWhenOrderIsConfirmed() {
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder confirmed = CustomerOrder.create(sagaId, "ORDER-2026-900001", Instant.now()).confirm(Instant.now());
-        when(orderProgressionService.getOrder(sagaId)).thenReturn(Mono.just(confirmed));
+        when(this.orderProgressionService.getOrder(sagaId)).thenReturn(Mono.just(confirmed));
 
         final WorkflowClient mockWorkflowClient = mock(WorkflowClient.class);
-        final OrderQueryHandler handler = new OrderQueryHandler(orderProgressionService, mockWorkflowClient, Schedulers.immediate());
+        final OrderQueryHandler handler = new OrderQueryHandler(this.orderProgressionService, mockWorkflowClient, Schedulers.immediate());
 
         StepVerifier.create(handler.getOrderStatus(sagaId))
                 .assertNext(response -> {
@@ -70,10 +70,10 @@ class OrderQueryHandlerTest {
     void getOrderStatusReturnsCompensatedWithoutQueryingTheWorkflowWhenOrderIsCancelled() {
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder cancelled = CustomerOrder.create(sagaId, "ORDER-2026-900002", Instant.now()).cancel(Instant.now());
-        when(orderProgressionService.getOrder(sagaId)).thenReturn(Mono.just(cancelled));
+        when(this.orderProgressionService.getOrder(sagaId)).thenReturn(Mono.just(cancelled));
 
         final WorkflowClient mockWorkflowClient = mock(WorkflowClient.class);
-        final OrderQueryHandler handler = new OrderQueryHandler(orderProgressionService, mockWorkflowClient, Schedulers.immediate());
+        final OrderQueryHandler handler = new OrderQueryHandler(this.orderProgressionService, mockWorkflowClient, Schedulers.immediate());
 
         StepVerifier.create(handler.getOrderStatus(sagaId))
                 .assertNext(response -> {
@@ -93,13 +93,13 @@ class OrderQueryHandlerTest {
      */
     @Test
     void getOrderStatusQueriesTheWorkflowLiveWhenOrderIsPending() {
-        testEnv = TestWorkflowEnvironment.newInstance();
-        final Worker worker = testEnv.newWorker(SagaTaskQueues.ORDER_SAGA);
+        this.testEnv = TestWorkflowEnvironment.newInstance();
+        final Worker worker = this.testEnv.newWorker(SagaTaskQueues.ORDER_SAGA);
         worker.registerWorkflowImplementationTypes(FakeOrderSagaWorkflow.class);
-        testEnv.start();
+        this.testEnv.start();
 
         final String businessKey = "ORDER-2026-900003";
-        final OrderSagaWorkflow runningWorkflow = testEnv.getWorkflowClient().newWorkflowStub(
+        final OrderSagaWorkflow runningWorkflow = this.testEnv.getWorkflowClient().newWorkflowStub(
                 OrderSagaWorkflow.class,
                 WorkflowOptions.newBuilder().setWorkflowId(businessKey).setTaskQueue(SagaTaskQueues.ORDER_SAGA).build());
         WorkflowClient.start(runningWorkflow::process,
@@ -107,10 +107,10 @@ class OrderQueryHandlerTest {
 
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder pending = CustomerOrder.create(sagaId, businessKey, Instant.now());
-        when(orderProgressionService.getOrder(sagaId)).thenReturn(Mono.just(pending));
+        when(this.orderProgressionService.getOrder(sagaId)).thenReturn(Mono.just(pending));
 
         final OrderQueryHandler handler =
-                new OrderQueryHandler(orderProgressionService, testEnv.getWorkflowClient(), Schedulers.immediate());
+                new OrderQueryHandler(this.orderProgressionService, this.testEnv.getWorkflowClient(), Schedulers.immediate());
 
         StepVerifier.create(handler.getOrderStatus(sagaId))
                 .assertNext(response -> {
@@ -132,7 +132,7 @@ class OrderQueryHandlerTest {
         final UUID sagaId = UUID.randomUUID();
         final String businessKey = "ORDER-2026-900004";
         final CustomerOrder pending = CustomerOrder.create(sagaId, businessKey, Instant.now());
-        when(orderProgressionService.getOrder(sagaId)).thenReturn(Mono.just(pending));
+        when(this.orderProgressionService.getOrder(sagaId)).thenReturn(Mono.just(pending));
 
         final OrderSagaWorkflow failingWorkflow = mock(OrderSagaWorkflow.class);
         final RuntimeException queryFailure = new RuntimeException("Simulated Temporal query failure");
@@ -141,7 +141,7 @@ class OrderQueryHandlerTest {
         final WorkflowClient mockWorkflowClient = mock(WorkflowClient.class);
         when(mockWorkflowClient.newWorkflowStub(OrderSagaWorkflow.class, businessKey)).thenReturn(failingWorkflow);
 
-        final OrderQueryHandler handler = new OrderQueryHandler(orderProgressionService, mockWorkflowClient, Schedulers.immediate());
+        final OrderQueryHandler handler = new OrderQueryHandler(this.orderProgressionService, mockWorkflowClient, Schedulers.immediate());
 
         StepVerifier.create(handler.getOrderStatus(sagaId))
                 .expectErrorSatisfies(error -> {
@@ -154,10 +154,10 @@ class OrderQueryHandlerTest {
     @Test
     void getOrderStatusPropagatesOrderNotFoundException() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderProgressionService.getOrder(sagaId)).thenReturn(Mono.error(new OrderNotFoundException(sagaId)));
+        when(this.orderProgressionService.getOrder(sagaId)).thenReturn(Mono.error(new OrderNotFoundException(sagaId)));
 
         final WorkflowClient mockWorkflowClient = mock(WorkflowClient.class);
-        final OrderQueryHandler handler = new OrderQueryHandler(orderProgressionService, mockWorkflowClient, Schedulers.immediate());
+        final OrderQueryHandler handler = new OrderQueryHandler(this.orderProgressionService, mockWorkflowClient, Schedulers.immediate());
 
         StepVerifier.create(handler.getOrderStatus(sagaId))
                 .expectError(OrderNotFoundException.class)

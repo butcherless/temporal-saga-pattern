@@ -24,25 +24,25 @@ class InventoryActivitiesImplTest {
 
     @BeforeEach
     void setUp() {
-        activities = new InventoryActivitiesImpl(ExchangeFunctionStub.webClientFor(exchangeFunction));
-        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.CREATED);
+        this.activities = new InventoryActivitiesImpl(ExchangeFunctionStub.webClientFor(this.exchangeFunction));
+        ExchangeFunctionStub.stubResponse(this.exchangeFunction, HttpStatus.CREATED);
     }
 
     @Test
     void reserveStockPostsToTheReservationsEndpoint() {
         final UUID sagaId = UUID.randomUUID();
 
-        activities.reserveStock(sagaId, "SKU-001", 5);
+        this.activities.reserveStock(sagaId, "SKU-001", 5);
 
-        ExchangeFunctionStub.assertPostedTo(exchangeFunction, "/inventory/reservations");
+        ExchangeFunctionStub.assertPostedTo(this.exchangeFunction, "/inventory/reservations");
     }
 
     @Test
     void reserveStockThrowsANonRetryableFailureWhenStockIsPermanentlyInsufficient() {
         ExchangeFunctionStub.stubResponse(
-                exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Insufficient stock for SKU-001: requested 999, available 100");
+                this.exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Insufficient stock for SKU-001: requested 999, available 100");
 
-        assertThatThrownBy(() -> activities.reserveStock(UUID.randomUUID(), "SKU-001", 999))
+        assertThatThrownBy(() -> this.activities.reserveStock(UUID.randomUUID(), "SKU-001", 999))
                 .isInstanceOf(ApplicationFailure.class)
                 .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
                 .isEqualTo(true);
@@ -57,9 +57,9 @@ class InventoryActivitiesImplTest {
     @Test
     void reserveStockRethrowsUnchangedWhenTheFailureIsNotPermanent() {
         ExchangeFunctionStub.stubResponse(
-                exchangeFunction, HttpStatus.SERVICE_UNAVAILABLE, "Simulated inventory gateway timeout for sku SKU-INPUTDATA-2");
+                this.exchangeFunction, HttpStatus.SERVICE_UNAVAILABLE, "Simulated inventory gateway timeout for sku SKU-INPUTDATA-2");
 
-        assertThatThrownBy(() -> activities.reserveStock(UUID.randomUUID(), "SKU-INPUTDATA-2", 5))
+        assertThatThrownBy(() -> this.activities.reserveStock(UUID.randomUUID(), "SKU-INPUTDATA-2", 5))
                 .isInstanceOf(WebClientResponseException.class)
                 .isNotInstanceOf(ApplicationFailure.class);
     }
@@ -67,29 +67,29 @@ class InventoryActivitiesImplTest {
     @Test
     void confirmReservationPostsToTheConfirmEndpointForTheGivenSagaId() {
         final UUID sagaId = UUID.randomUUID();
-        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.OK);
+        ExchangeFunctionStub.stubResponse(this.exchangeFunction, HttpStatus.OK);
 
-        activities.confirmReservation(sagaId);
+        this.activities.confirmReservation(sagaId);
 
-        ExchangeFunctionStub.assertPostedTo(exchangeFunction, "/inventory/reservations/%s/confirm".formatted(sagaId));
+        ExchangeFunctionStub.assertPostedTo(this.exchangeFunction, "/inventory/reservations/%s/confirm".formatted(sagaId));
     }
 
     @Test
     void releaseStockPostsToTheReleaseEndpointForTheGivenSagaId() {
         final UUID sagaId = UUID.randomUUID();
-        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.OK);
+        ExchangeFunctionStub.stubResponse(this.exchangeFunction, HttpStatus.OK);
 
-        activities.releaseStock(sagaId);
+        this.activities.releaseStock(sagaId);
 
-        ExchangeFunctionStub.assertPostedTo(exchangeFunction, "/inventory/reservations/%s/release".formatted(sagaId));
+        ExchangeFunctionStub.assertPostedTo(this.exchangeFunction, "/inventory/reservations/%s/release".formatted(sagaId));
     }
 
     @Test
     void releaseStockThrowsANonRetryableFailureWhenTheReleaseIsPermanentlyUnrecoverable() {
         ExchangeFunctionStub.stubResponse(
-                exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Simulated unrecoverable release failure for sku SKU-INPUTDATA-6");
+                this.exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Simulated unrecoverable release failure for sku SKU-INPUTDATA-6");
 
-        assertThatThrownBy(() -> activities.releaseStock(UUID.randomUUID()))
+        assertThatThrownBy(() -> this.activities.releaseStock(UUID.randomUUID()))
                 .isInstanceOf(ApplicationFailure.class)
                 .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
                 .isEqualTo(true);

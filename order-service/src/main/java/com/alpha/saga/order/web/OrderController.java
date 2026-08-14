@@ -54,7 +54,7 @@ public class OrderController {
     public Mono<ResponseEntity<CreateOrderResponseBody>> createOrder(@RequestBody final CreateOrderRequestBody request) {
         log.debug("createOrder - {}", request);
 
-        return orderCreationHandler.createOrder(request)
+        return this.orderCreationHandler.createOrder(request)
                 .map(response -> ResponseEntity.status(HttpStatus.ACCEPTED).body(response));
     }
 
@@ -67,7 +67,7 @@ public class OrderController {
             @PathVariable("sagaId") @Parameter(description = "The saga id, also the order's id") final UUID sagaId) {
         log.debug("confirmOrder - {}", sagaId);
 
-        return orderProgressionService.confirmOrder(new ConfirmOrderRequest(sagaId, Instant.now()))
+        return this.orderProgressionService.confirmOrder(new ConfirmOrderRequest(sagaId, Instant.now()))
                 .map(order -> ResponseEntity.ok(new ConfirmOrderResponseBody(order.id(), order.status())));
     }
 
@@ -80,7 +80,7 @@ public class OrderController {
             @PathVariable("sagaId") @Parameter(description = "The saga id, also the order's id") final UUID sagaId) {
         log.debug("cancelOrder - {}", sagaId);
 
-        return orderProgressionService.cancelOrder(new CancelOrderRequest(sagaId, Instant.now()))
+        return this.orderProgressionService.cancelOrder(new CancelOrderRequest(sagaId, Instant.now()))
                 .map(order -> ResponseEntity.ok(new CancelOrderResponseBody(order.id(), order.status())));
     }
 
@@ -95,6 +95,6 @@ public class OrderController {
             @PathVariable("sagaId") @Parameter(description = "The saga id, also the order's id") final UUID sagaId) {
         log.debug("getOrderStatus - {}", sagaId);
 
-        return orderQueryHandler.getOrderStatus(sagaId).map(ResponseEntity::ok);
+        return this.orderQueryHandler.getOrderStatus(sagaId).map(ResponseEntity::ok);
     }
 }

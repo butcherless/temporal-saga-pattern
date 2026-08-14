@@ -27,7 +27,7 @@ public class InventoryActivitiesImpl implements InventoryActivities {
             final String sku,
             final Integer quantity) {
         log.debug("reserveStock - sagaId={}, sku={}, quantity={}", sagaId, sku, quantity);
-        inventoryWebClient.post()
+        this.inventoryWebClient.post()
                 .uri("/inventory/reservations")
                 .bodyValue(new InventoryReservationRequest(sagaId, sku, quantity))
                 .retrieve()
@@ -52,7 +52,7 @@ public class InventoryActivitiesImpl implements InventoryActivities {
     @Override
     public void confirmReservation(final UUID sagaId) {
         log.debug("confirmReservation - sagaId={}", sagaId);
-        inventoryWebClient.post()
+        this.inventoryWebClient.post()
                 .uri("/inventory/reservations/{sagaId}/confirm", sagaId)
                 .retrieve()
                 .toBodilessEntity()
@@ -62,7 +62,7 @@ public class InventoryActivitiesImpl implements InventoryActivities {
     @Override
     public void releaseStock(final UUID sagaId) {
         log.debug("releaseStock - sagaId={}", sagaId);
-        inventoryWebClient.post()
+        this.inventoryWebClient.post()
                 .uri("/inventory/reservations/{sagaId}/release", sagaId)
                 .retrieve()
                 .toBodilessEntity()

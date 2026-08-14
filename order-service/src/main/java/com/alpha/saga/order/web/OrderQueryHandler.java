@@ -39,20 +39,20 @@ public class OrderQueryHandler {
 
     public Mono<OrderStatusResponseBody> getOrderStatus(final UUID sagaId) {
         log.debug("getOrderStatus - {}", sagaId);
-        return orderProgressionService.getOrder(sagaId)
+        return this.orderProgressionService.getOrder(sagaId)
                 .flatMap(order -> switch (order.status()) {
                     case CONFIRMED -> Mono.just(new OrderStatusResponseBody(order.id(), order.status(), OrderSagaProgress.COMPLETED));
                     case CANCELLED -> Mono.just(new OrderStatusResponseBody(order.id(), order.status(), OrderSagaProgress.COMPENSATED));
-                    case PENDING -> queryWorkflowProgress(order);
+                    case PENDING -> this.queryWorkflowProgress(order);
                 });
     }
 
     private Mono<OrderStatusResponseBody> queryWorkflowProgress(final CustomerOrder order) {
-        final OrderSagaWorkflow workflow = workflowClient.newWorkflowStub(OrderSagaWorkflow.class, order.businessKey());
+        final OrderSagaWorkflow workflow = this.workflowClient.newWorkflowStub(OrderSagaWorkflow.class, order.businessKey());
         // WorkflowStub query methods are a blocking gRPC call; run it off the WebFlux event loop,
         // same as OrderCreationHandler's own blocking WorkflowClient.start bridge.
         return Mono.fromCallable(workflow::getProgress)
-                .subscribeOn(blockingCallScheduler)
+                .subscribeOn(this.blockingCallScheduler)
                 .map(progress -> new OrderStatusResponseBody(order.id(), order.status(), progress))
                 // The order is still PENDING, so the Workflow Execution should exist and be
                 // queryable; a failure here (not found, gRPC timeout, ...) is a transient

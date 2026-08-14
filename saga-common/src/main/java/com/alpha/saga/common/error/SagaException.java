@@ -21,6 +21,6 @@ public abstract class SagaException extends RuntimeException {
     }
 
     public ErrorType errorType() {
-        return errorType;
+        return this.errorType;
     }
 }

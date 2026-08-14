@@ -20,6 +20,6 @@ public final class OrderNotFoundException extends RuntimeException {
     }
 
     public UUID sagaId() {
-        return sagaId;
+        return this.sagaId;
     }
 }

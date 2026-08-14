@@ -19,7 +19,7 @@ class VirtualThreadWorkerOptionsCustomizerTest {
      */
     @Test
     void customizeEnablesVirtualThreadsOnlyForTheActivityWorker() {
-        final WorkerOptions options = customizer.customize(WorkerOptions.newBuilder(), "orderSagaWorker", "order-saga-task-queue").build();
+        final WorkerOptions options = this.customizer.customize(WorkerOptions.newBuilder(), "orderSagaWorker", "order-saga-task-queue").build();
 
         assertThat(options.isUsingVirtualThreadsOnActivityWorker()).isTrue();
         assertThat(options.isUsingVirtualThreadsOnWorkflowWorker()).isFalse();
@@ -31,6 +31,6 @@ class VirtualThreadWorkerOptionsCustomizerTest {
     void customizeReturnsTheSameBuilderInstance() {
         final WorkerOptions.Builder builder = WorkerOptions.newBuilder();
 
-        assertThat(customizer.customize(builder, "orderSagaWorker", "order-saga-task-queue")).isSameAs(builder);
+        assertThat(this.customizer.customize(builder, "orderSagaWorker", "order-saga-task-queue")).isSameAs(builder);
     }
 }

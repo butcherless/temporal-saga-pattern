@@ -22,10 +22,10 @@ public final class IllegalOrderTransitionException extends IllegalStateException
     }
 
     public OrderStatus from() {
-        return from;
+        return this.from;
     }
 
     public OrderStatus to() {
-        return to;
+        return this.to;
     }
 }

@@ -36,6 +36,6 @@ public record CreateOrderRequestBody(
     }
 
     public Boolean hasNoBusinessKey() {
-        return businessKey == null || businessKey.isBlank();
+        return this.businessKey == null || this.businessKey.isBlank();
     }
 }

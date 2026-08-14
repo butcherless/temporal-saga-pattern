@@ -23,10 +23,10 @@ public final class IllegalPaymentTransitionException extends IllegalStateExcepti
     }
 
     public PaymentStatus from() {
-        return from;
+        return this.from;
     }
 
     public PaymentStatus to() {
-        return to;
+        return this.to;
     }
 }

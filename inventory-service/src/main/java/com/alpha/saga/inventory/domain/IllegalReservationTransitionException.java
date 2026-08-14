@@ -23,10 +23,10 @@ public final class IllegalReservationTransitionException extends IllegalStateExc
     }
 
     public ReservationStatus from() {
-        return from;
+        return this.from;
     }
 
     public ReservationStatus to() {
-        return to;
+        return this.to;
     }
 }

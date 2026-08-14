@@ -43,17 +43,17 @@ class PaymentProgressionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PaymentProgressionService(paymentRepository, partialRefundRepository);
-        lenient().when(paymentRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
-        lenient().when(partialRefundRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        this.service = new PaymentProgressionService(this.paymentRepository, this.partialRefundRepository);
+        lenient().when(this.paymentRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        lenient().when(this.partialRefundRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
     }
 
     @Test
     void requestPaymentCompletesImmediatelyForASmallAmount() {
         final UUID sagaId = UUID.randomUUID();
-        when(paymentRepository.findById(sagaId)).thenReturn(Mono.empty());
+        when(this.paymentRepository.findById(sagaId)).thenReturn(Mono.empty());
 
-        StepVerifier.create(service.requestPayment(new RequestPaymentRequest(sagaId, new BigDecimal("100.00"), NOW)))
+        StepVerifier.create(this.service.requestPayment(new RequestPaymentRequest(sagaId, new BigDecimal("100.00"), NOW)))
                 .assertNext(payment -> {
                     assertThat(payment.status()).isEqualTo(PaymentStatus.COMPLETED);
                     assertThat(payment.attempt()).isEqualTo(1);
@@ -64,22 +64,22 @@ class PaymentProgressionServiceTest {
     @Test
     void requestPaymentTimesOutOnFirstAttemptForAMediumAmount() {
         final UUID sagaId = UUID.randomUUID();
-        when(paymentRepository.findById(sagaId)).thenReturn(Mono.empty());
+        when(this.paymentRepository.findById(sagaId)).thenReturn(Mono.empty());
 
-        StepVerifier.create(service.requestPayment(new RequestPaymentRequest(sagaId, PaymentProgressionService.FLAKY_THRESHOLD, NOW)))
+        StepVerifier.create(this.service.requestPayment(new RequestPaymentRequest(sagaId, PaymentProgressionService.FLAKY_THRESHOLD, NOW)))
                 .expectError(TemporarySagaException.class)
                 .verify();
 
-        verify(paymentRepository).save(new Payment(sagaId, PaymentProgressionService.FLAKY_THRESHOLD, PaymentStatus.PENDING, 1, NOW, NOW, null));
+        verify(this.paymentRepository).save(new Payment(sagaId, PaymentProgressionService.FLAKY_THRESHOLD, PaymentStatus.PENDING, 1, NOW, NOW, null));
     }
 
     @Test
     void requestPaymentSucceedsOnRetryAfterATimeout() {
         final UUID sagaId = UUID.randomUUID();
         final Payment pendingFirstAttempt = Payment.request(sagaId, PaymentProgressionService.FLAKY_THRESHOLD, NOW);
-        when(paymentRepository.findById(sagaId)).thenReturn(Mono.just(pendingFirstAttempt));
+        when(this.paymentRepository.findById(sagaId)).thenReturn(Mono.just(pendingFirstAttempt));
 
-        StepVerifier.create(service.requestPayment(new RequestPaymentRequest(sagaId, PaymentProgressionService.FLAKY_THRESHOLD, NOW)))
+        StepVerifier.create(this.service.requestPayment(new RequestPaymentRequest(sagaId, PaymentProgressionService.FLAKY_THRESHOLD, NOW)))
                 .assertNext(payment -> {
                     assertThat(payment.status()).isEqualTo(PaymentStatus.COMPLETED);
                     assertThat(payment.attempt()).isEqualTo(2);
@@ -90,48 +90,48 @@ class PaymentProgressionServiceTest {
     @Test
     void requestPaymentIsDeclinedForALargeAmount() {
         final UUID sagaId = UUID.randomUUID();
-        when(paymentRepository.findById(sagaId)).thenReturn(Mono.empty());
+        when(this.paymentRepository.findById(sagaId)).thenReturn(Mono.empty());
 
-        StepVerifier.create(service.requestPayment(new RequestPaymentRequest(sagaId, PaymentProgressionService.HARD_DECLINE_THRESHOLD, NOW)))
+        StepVerifier.create(this.service.requestPayment(new RequestPaymentRequest(sagaId, PaymentProgressionService.HARD_DECLINE_THRESHOLD, NOW)))
                 .expectError(PermanentSagaException.class)
                 .verify();
 
-        verify(paymentRepository).save(new Payment(sagaId, PaymentProgressionService.HARD_DECLINE_THRESHOLD, PaymentStatus.FAILED, 1, NOW, NOW, null));
+        verify(this.paymentRepository).save(new Payment(sagaId, PaymentProgressionService.HARD_DECLINE_THRESHOLD, PaymentStatus.FAILED, 1, NOW, NOW, null));
     }
 
     @Test
     void requestPaymentIsIdempotentWhenAlreadyCompleted() {
         final UUID sagaId = UUID.randomUUID();
         final Payment completed = Payment.request(sagaId, new BigDecimal("100.00"), NOW).complete(NOW);
-        when(paymentRepository.findById(sagaId)).thenReturn(Mono.just(completed));
+        when(this.paymentRepository.findById(sagaId)).thenReturn(Mono.just(completed));
 
-        StepVerifier.create(service.requestPayment(new RequestPaymentRequest(sagaId, new BigDecimal("100.00"), NOW)))
+        StepVerifier.create(this.service.requestPayment(new RequestPaymentRequest(sagaId, new BigDecimal("100.00"), NOW)))
                 .assertNext(payment -> assertThat(payment.status()).isEqualTo(PaymentStatus.COMPLETED))
                 .verifyComplete();
 
-        verify(paymentRepository, never()).save(any());
+        verify(this.paymentRepository, never()).save(any());
     }
 
     @Test
     void requestPaymentIsIdempotentWhenAlreadyFailed() {
         final UUID sagaId = UUID.randomUUID();
         final Payment failed = Payment.request(sagaId, new BigDecimal("50000.00"), NOW).fail(NOW);
-        when(paymentRepository.findById(sagaId)).thenReturn(Mono.just(failed));
+        when(this.paymentRepository.findById(sagaId)).thenReturn(Mono.just(failed));
 
-        StepVerifier.create(service.requestPayment(new RequestPaymentRequest(sagaId, new BigDecimal("50000.00"), NOW)))
+        StepVerifier.create(this.service.requestPayment(new RequestPaymentRequest(sagaId, new BigDecimal("50000.00"), NOW)))
                 .assertNext(payment -> assertThat(payment.status()).isEqualTo(PaymentStatus.FAILED))
                 .verifyComplete();
 
-        verify(paymentRepository, never()).save(any());
+        verify(this.paymentRepository, never()).save(any());
     }
 
     @Test
     void refundPaymentAdvancesFromCompletedToRefunded() {
         final UUID sagaId = UUID.randomUUID();
         final Payment completed = Payment.request(sagaId, new BigDecimal("100.00"), NOW).complete(NOW);
-        when(paymentRepository.findById(sagaId)).thenReturn(Mono.just(completed));
+        when(this.paymentRepository.findById(sagaId)).thenReturn(Mono.just(completed));
 
-        StepVerifier.create(service.refundPayment(new RefundPaymentRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.refundPayment(new RefundPaymentRequest(sagaId, NOW)))
                 .assertNext(payment -> assertThat(payment.status()).isEqualTo(PaymentStatus.REFUNDED))
                 .verifyComplete();
     }
@@ -140,22 +140,22 @@ class PaymentProgressionServiceTest {
     void refundPaymentIsIdempotentWhenAlreadyRefunded() {
         final UUID sagaId = UUID.randomUUID();
         final Payment refunded = Payment.request(sagaId, new BigDecimal("100.00"), NOW).complete(NOW).refund(NOW);
-        when(paymentRepository.findById(sagaId)).thenReturn(Mono.just(refunded));
+        when(this.paymentRepository.findById(sagaId)).thenReturn(Mono.just(refunded));
 
-        StepVerifier.create(service.refundPayment(new RefundPaymentRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.refundPayment(new RefundPaymentRequest(sagaId, NOW)))
                 .assertNext(payment -> assertThat(payment.status()).isEqualTo(PaymentStatus.REFUNDED))
                 .verifyComplete();
 
-        verify(paymentRepository, never()).save(any());
+        verify(this.paymentRepository, never()).save(any());
     }
 
     @Test
     void refundingAPendingPaymentThrows() {
         final UUID sagaId = UUID.randomUUID();
         final Payment pending = Payment.request(sagaId, new BigDecimal("100.00"), NOW);
-        when(paymentRepository.findById(sagaId)).thenReturn(Mono.just(pending));
+        when(this.paymentRepository.findById(sagaId)).thenReturn(Mono.just(pending));
 
-        StepVerifier.create(service.refundPayment(new RefundPaymentRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.refundPayment(new RefundPaymentRequest(sagaId, NOW)))
                 .expectError(IllegalPaymentTransitionException.class)
                 .verify();
     }
@@ -163,9 +163,9 @@ class PaymentProgressionServiceTest {
     @Test
     void refundPaymentFailsWhenNotFound() {
         final UUID sagaId = UUID.randomUUID();
-        when(paymentRepository.findById(sagaId)).thenReturn(Mono.empty());
+        when(this.paymentRepository.findById(sagaId)).thenReturn(Mono.empty());
 
-        StepVerifier.create(service.refundPayment(new RefundPaymentRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.refundPayment(new RefundPaymentRequest(sagaId, NOW)))
                 .expectError(IllegalStateException.class)
                 .verify();
     }
@@ -174,21 +174,21 @@ class PaymentProgressionServiceTest {
     void refundPaymentThrowsPermanentlyForTheRefundFailureAmountWithoutTouchingPersistence() {
         final UUID sagaId = UUID.randomUUID();
         final Payment completed = Payment.request(sagaId, PaymentProgressionService.PERMANENT_REFUND_FAILURE_AMOUNT, NOW).complete(NOW);
-        when(paymentRepository.findById(sagaId)).thenReturn(Mono.just(completed));
+        when(this.paymentRepository.findById(sagaId)).thenReturn(Mono.just(completed));
 
-        StepVerifier.create(service.refundPayment(new RefundPaymentRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.refundPayment(new RefundPaymentRequest(sagaId, NOW)))
                 .expectError(PermanentSagaException.class)
                 .verify();
 
-        verify(paymentRepository, never()).save(any());
+        verify(this.paymentRepository, never()).save(any());
     }
 
     @Test
     void issuePartialRefundCreatesANewStandaloneRefund() {
         final UUID sagaId = UUID.randomUUID();
-        when(partialRefundRepository.findById(sagaId)).thenReturn(Mono.empty());
+        when(this.partialRefundRepository.findById(sagaId)).thenReturn(Mono.empty());
 
-        StepVerifier.create(service.issuePartialRefund(new IssuePartialRefundRequest(sagaId, new BigDecimal("20.00"), NOW)))
+        StepVerifier.create(this.service.issuePartialRefund(new IssuePartialRefundRequest(sagaId, new BigDecimal("20.00"), NOW)))
                 .assertNext(refund -> {
                     assertThat(refund.id()).isEqualTo(sagaId);
                     assertThat(refund.relatedSagaId()).isEqualTo(sagaId);
@@ -197,19 +197,19 @@ class PaymentProgressionServiceTest {
                 })
                 .verifyComplete();
 
-        verify(paymentRepository, never()).findById(any(UUID.class));
+        verify(this.paymentRepository, never()).findById(any(UUID.class));
     }
 
     @Test
     void issuePartialRefundIsIdempotentAndReturnsTheExistingRefund() {
         final UUID sagaId = UUID.randomUUID();
         final PartialRefund existing = new PartialRefund(sagaId, sagaId, new BigDecimal("20.00"), NOW, 0L);
-        when(partialRefundRepository.findById(sagaId)).thenReturn(Mono.just(existing));
+        when(this.partialRefundRepository.findById(sagaId)).thenReturn(Mono.just(existing));
 
-        StepVerifier.create(service.issuePartialRefund(new IssuePartialRefundRequest(sagaId, new BigDecimal("20.00"), NOW)))
+        StepVerifier.create(this.service.issuePartialRefund(new IssuePartialRefundRequest(sagaId, new BigDecimal("20.00"), NOW)))
                 .assertNext(refund -> assertThat(refund).isEqualTo(existing))
                 .verifyComplete();
 
-        verify(partialRefundRepository, never()).save(any());
+        verify(this.partialRefundRepository, never()).save(any());
     }
 }

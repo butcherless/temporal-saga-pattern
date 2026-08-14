@@ -51,7 +51,7 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
             final ServerWebExchange exchange) {
         final Throwable cause = ex.getMostSpecificCause();
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, cause.getMessage());
-        return handleExceptionInternal(ex, problemDetail, headers, status, exchange);
+        return this.handleExceptionInternal(ex, problemDetail, headers, status, exchange);
     }
 
     @ExceptionHandler(PermanentSagaException.class)
@@ -59,7 +59,7 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
             final PermanentSagaException ex,
             final ServerWebExchange exchange) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage());
-        return handleExceptionInternal(ex, problemDetail, new HttpHeaders(), HttpStatus.UNPROCESSABLE_CONTENT, exchange);
+        return this.handleExceptionInternal(ex, problemDetail, new HttpHeaders(), HttpStatus.UNPROCESSABLE_CONTENT, exchange);
     }
 
     @ExceptionHandler(TemporarySagaException.class)
@@ -67,7 +67,7 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
             final TemporarySagaException ex,
             final ServerWebExchange exchange) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
-        return handleExceptionInternal(ex, problemDetail, new HttpHeaders(), HttpStatus.SERVICE_UNAVAILABLE, exchange);
+        return this.handleExceptionInternal(ex, problemDetail, new HttpHeaders(), HttpStatus.SERVICE_UNAVAILABLE, exchange);
     }
 
     @ExceptionHandler(OrderNotFoundException.class)
@@ -75,6 +75,6 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
             final OrderNotFoundException ex,
             final ServerWebExchange exchange) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
-        return handleExceptionInternal(ex, problemDetail, new HttpHeaders(), HttpStatus.NOT_FOUND, exchange);
+        return this.handleExceptionInternal(ex, problemDetail, new HttpHeaders(), HttpStatus.NOT_FOUND, exchange);
     }
 }

@@ -54,7 +54,7 @@ public record InventoryReservation(
      * @throws IllegalReservationTransitionException if {@code status} cannot transition to {@link ReservationStatus#CONFIRMED}
      */
     public InventoryReservation confirm(final Instant now) {
-        return advanceTo(ReservationStatus.CONFIRMED, now);
+        return this.advanceTo(ReservationStatus.CONFIRMED, now);
     }
 
     /**
@@ -63,15 +63,15 @@ public record InventoryReservation(
      * @throws IllegalReservationTransitionException if {@code status} cannot transition to {@link ReservationStatus#RELEASED}
      */
     public InventoryReservation release(final Instant now) {
-        return advanceTo(ReservationStatus.RELEASED, now);
+        return this.advanceTo(ReservationStatus.RELEASED, now);
     }
 
     private InventoryReservation advanceTo(final ReservationStatus target,
             final Instant now) {
         Objects.requireNonNull(now, "now must not be null");
-        if (!status.canTransitionTo(target)) {
-            throw new IllegalReservationTransitionException(status, target);
+        if (!this.status.canTransitionTo(target)) {
+            throw new IllegalReservationTransitionException(this.status, target);
         }
-        return new InventoryReservation(id, sku, quantity, target, createdAt, now, version);
+        return new InventoryReservation(this.id, this.sku, this.quantity, target, this.createdAt, now, this.version);
     }
 }

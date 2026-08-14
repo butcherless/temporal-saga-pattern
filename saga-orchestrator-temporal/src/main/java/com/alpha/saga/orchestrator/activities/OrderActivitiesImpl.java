@@ -25,7 +25,7 @@ public class OrderActivitiesImpl implements OrderActivities {
     @Override
     public void confirmOrder(final UUID sagaId) {
         log.debug("confirmOrder - sagaId={}", sagaId);
-        orderWebClient.post()
+        this.orderWebClient.post()
                 .uri("/orders/{sagaId}/confirm", sagaId)
                 .retrieve()
                 .toBodilessEntity()
@@ -50,7 +50,7 @@ public class OrderActivitiesImpl implements OrderActivities {
     @Override
     public void cancelOrder(final UUID sagaId) {
         log.debug("cancelOrder - sagaId={}", sagaId);
-        orderWebClient.post()
+        this.orderWebClient.post()
                 .uri("/orders/{sagaId}/cancel", sagaId)
                 .retrieve()
                 .toBodilessEntity()

@@ -32,7 +32,7 @@ class InventoryControllerTest {
 
     @BeforeEach
     void setUp() {
-        client = WebTestClient.bindToController(new InventoryController(inventoryProgressionService))
+        this.client = WebTestClient.bindToController(new InventoryController(this.inventoryProgressionService))
                 .controllerAdvice(new RestExceptionHandler())
                 .build();
     }
@@ -41,9 +41,9 @@ class InventoryControllerTest {
     void reserveStockReturns201WithTheReservation() {
         final UUID sagaId = UUID.randomUUID();
         final InventoryReservation reservation = InventoryReservation.reserve(sagaId, "SKU-001", 5, Instant.now());
-        when(inventoryProgressionService.reserveStock(any())).thenReturn(Mono.just(reservation));
+        when(this.inventoryProgressionService.reserveStock(any())).thenReturn(Mono.just(reservation));
 
-        client.post().uri("/inventory/reservations")
+        this.client.post().uri("/inventory/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","sku":"SKU-001","quantity":5}""".formatted(sagaId))
@@ -56,7 +56,7 @@ class InventoryControllerTest {
 
     @Test
     void reserveStockRejectsAnInvalidRequestBodyWithAProblemDetail() {
-        final ResponseSpec response = client.post().uri("/inventory/reservations")
+        final ResponseSpec response = this.client.post().uri("/inventory/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","sku":"SKU-001","quantity":-1}""".formatted(UUID.randomUUID()))
@@ -68,10 +68,10 @@ class InventoryControllerTest {
     @Test
     void reserveStockReturns422WhenStockIsPermanentlyInsufficient() {
         final UUID sagaId = UUID.randomUUID();
-        when(inventoryProgressionService.reserveStock(any()))
+        when(this.inventoryProgressionService.reserveStock(any()))
                 .thenReturn(Mono.error(new PermanentSagaException("Insufficient stock for SKU-001: requested 999, available 100")));
 
-        final ResponseSpec response = client.post().uri("/inventory/reservations")
+        final ResponseSpec response = this.client.post().uri("/inventory/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","sku":"SKU-001","quantity":999}""".formatted(sagaId))
@@ -83,10 +83,10 @@ class InventoryControllerTest {
     @Test
     void reserveStockReturns503WhenTheGatewayTimesOut() {
         final UUID sagaId = UUID.randomUUID();
-        when(inventoryProgressionService.reserveStock(any()))
+        when(this.inventoryProgressionService.reserveStock(any()))
                 .thenReturn(Mono.error(new TemporarySagaException("Simulated inventory gateway timeout for sku SKU-INPUTDATA-2")));
 
-        final ResponseSpec response = client.post().uri("/inventory/reservations")
+        final ResponseSpec response = this.client.post().uri("/inventory/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","sku":"SKU-INPUTDATA-2","quantity":5}""".formatted(sagaId))
@@ -99,9 +99,9 @@ class InventoryControllerTest {
     void confirmReservationReturns200WithTheConfirmedStatus() {
         final UUID sagaId = UUID.randomUUID();
         final InventoryReservation confirmed = InventoryReservation.reserve(sagaId, "SKU-001", 5, Instant.now()).confirm(Instant.now());
-        when(inventoryProgressionService.confirmReservation(any())).thenReturn(Mono.just(confirmed));
+        when(this.inventoryProgressionService.confirmReservation(any())).thenReturn(Mono.just(confirmed));
 
-        client.post().uri("/inventory/reservations/{sagaId}/confirm", sagaId)
+        this.client.post().uri("/inventory/reservations/{sagaId}/confirm", sagaId)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -118,10 +118,10 @@ class InventoryControllerTest {
     @Test
     void confirmReservationReturns500WhenTheReservationCannotLegallyBeConfirmed() {
         final UUID sagaId = UUID.randomUUID();
-        when(inventoryProgressionService.confirmReservation(any()))
+        when(this.inventoryProgressionService.confirmReservation(any()))
                 .thenReturn(Mono.error(new IllegalReservationTransitionException(ReservationStatus.RELEASED, ReservationStatus.CONFIRMED)));
 
-        client.post().uri("/inventory/reservations/{sagaId}/confirm", sagaId)
+        this.client.post().uri("/inventory/reservations/{sagaId}/confirm", sagaId)
                 .exchange()
                 .expectStatus().is5xxServerError();
     }
@@ -130,9 +130,9 @@ class InventoryControllerTest {
     void releaseStockReturns200WithTheReleasedStatus() {
         final UUID sagaId = UUID.randomUUID();
         final InventoryReservation released = InventoryReservation.reserve(sagaId, "SKU-001", 5, Instant.now()).release(Instant.now());
-        when(inventoryProgressionService.releaseStock(any())).thenReturn(Mono.just(released));
+        when(this.inventoryProgressionService.releaseStock(any())).thenReturn(Mono.just(released));
 
-        client.post().uri("/inventory/reservations/{sagaId}/release", sagaId)
+        this.client.post().uri("/inventory/reservations/{sagaId}/release", sagaId)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -143,10 +143,10 @@ class InventoryControllerTest {
     @Test
     void releaseStockReturns422WhenTheReleaseIsPermanentlyUnrecoverable() {
         final UUID sagaId = UUID.randomUUID();
-        when(inventoryProgressionService.releaseStock(any()))
+        when(this.inventoryProgressionService.releaseStock(any()))
                 .thenReturn(Mono.error(new PermanentSagaException("Simulated unrecoverable release failure for sku SKU-INPUTDATA-6")));
 
-        final ResponseSpec response = client.post().uri("/inventory/reservations/{sagaId}/release", sagaId).exchange();
+        final ResponseSpec response = this.client.post().uri("/inventory/reservations/{sagaId}/release", sagaId).exchange();
 
         assertProblemDetail(response, 422, "Simulated unrecoverable release failure for sku SKU-INPUTDATA-6");
     }
@@ -154,9 +154,9 @@ class InventoryControllerTest {
     @Test
     void creditStockReturns200() {
         final UUID sagaId = UUID.randomUUID();
-        when(inventoryProgressionService.creditStock(any())).thenReturn(Mono.empty());
+        when(this.inventoryProgressionService.creditStock(any())).thenReturn(Mono.empty());
 
-        client.post().uri("/inventory/reservations/credit")
+        this.client.post().uri("/inventory/reservations/credit")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","sku":"SKU-001","quantity":10}""".formatted(sagaId))
@@ -166,7 +166,7 @@ class InventoryControllerTest {
 
     @Test
     void creditStockRejectsAnInvalidRequestBodyWithAProblemDetail() {
-        final ResponseSpec response = client.post().uri("/inventory/reservations/credit")
+        final ResponseSpec response = this.client.post().uri("/inventory/reservations/credit")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","sku":"SKU-001","quantity":-1}""".formatted(UUID.randomUUID()))

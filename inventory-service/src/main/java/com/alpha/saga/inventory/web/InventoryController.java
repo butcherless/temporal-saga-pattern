@@ -49,7 +49,7 @@ public class InventoryController {
     public Mono<ResponseEntity<ReservationResponseBody>> reserveStock(@RequestBody final ReserveStockRequestBody request) {
         log.debug("reserveStock - {}", request);
 
-        return inventoryProgressionService.reserveStock(new ReserveStockRequest(request.sagaId(), request.sku(), request.quantity(), Instant.now()))
+        return this.inventoryProgressionService.reserveStock(new ReserveStockRequest(request.sagaId(), request.sku(), request.quantity(), Instant.now()))
                 .map(reservation -> ResponseEntity.status(HttpStatus.CREATED)
                         .body(new ReservationResponseBody(reservation.id(), reservation.status())));
     }
@@ -63,7 +63,7 @@ public class InventoryController {
             @PathVariable("sagaId") @Parameter(description = "The saga id, also the reservation's id") final UUID sagaId) {
         log.debug("confirmReservation - {}", sagaId);
 
-        return inventoryProgressionService.confirmReservation(new ConfirmReservationRequest(sagaId, Instant.now()))
+        return this.inventoryProgressionService.confirmReservation(new ConfirmReservationRequest(sagaId, Instant.now()))
                 .map(reservation -> ResponseEntity.ok(new ReservationResponseBody(reservation.id(), reservation.status())));
     }
 
@@ -76,7 +76,7 @@ public class InventoryController {
             @PathVariable("sagaId") @Parameter(description = "The saga id, also the reservation's id") final UUID sagaId) {
         log.debug("releaseStock - {}", sagaId);
 
-        return inventoryProgressionService.releaseStock(new ReleaseStockRequest(sagaId, Instant.now()))
+        return this.inventoryProgressionService.releaseStock(new ReleaseStockRequest(sagaId, Instant.now()))
                 .map(reservation -> ResponseEntity.ok(new ReservationResponseBody(reservation.id(), reservation.status())));
     }
 
@@ -91,7 +91,7 @@ public class InventoryController {
     public Mono<ResponseEntity<Void>> creditStock(@RequestBody final CreditStockRequestBody request) {
         log.debug("creditStock - {}", request);
 
-        return inventoryProgressionService.creditStock(new CreditStockRequest(request.sagaId(), request.sku(), request.quantity(), Instant.now()))
+        return this.inventoryProgressionService.creditStock(new CreditStockRequest(request.sagaId(), request.sku(), request.quantity(), Instant.now()))
                 .thenReturn(ResponseEntity.ok().build());
     }
 }

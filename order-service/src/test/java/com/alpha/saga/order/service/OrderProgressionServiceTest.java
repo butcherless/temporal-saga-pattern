@@ -40,16 +40,16 @@ class OrderProgressionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new OrderProgressionService(orderRepository);
-        lenient().when(orderRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        this.service = new OrderProgressionService(this.orderRepository);
+        lenient().when(this.orderRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
     }
 
     @Test
     void createOrderCreatesANewOrderWhenBusinessKeyIsUnseen() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderRepository.findByBusinessKey(BUSINESS_KEY)).thenReturn(Mono.empty());
+        when(this.orderRepository.findByBusinessKey(BUSINESS_KEY)).thenReturn(Mono.empty());
 
-        StepVerifier.create(service.createOrder(new CreateOrderRequest(sagaId, BUSINESS_KEY, NOW)))
+        StepVerifier.create(this.service.createOrder(new CreateOrderRequest(sagaId, BUSINESS_KEY, NOW)))
                 .assertNext(order -> {
                     assertThat(order.id()).isEqualTo(sagaId);
                     assertThat(order.businessKey()).isEqualTo(BUSINESS_KEY);
@@ -61,22 +61,22 @@ class OrderProgressionServiceTest {
     @Test
     void createOrderIsIdempotentAndReturnsTheExistingOrderForAKnownBusinessKey() {
         final CustomerOrder existing = CustomerOrder.create(UUID.randomUUID(), BUSINESS_KEY, NOW);
-        when(orderRepository.findByBusinessKey(BUSINESS_KEY)).thenReturn(Mono.just(existing));
+        when(this.orderRepository.findByBusinessKey(BUSINESS_KEY)).thenReturn(Mono.just(existing));
 
-        StepVerifier.create(service.createOrder(new CreateOrderRequest(UUID.randomUUID(), BUSINESS_KEY, NOW)))
+        StepVerifier.create(this.service.createOrder(new CreateOrderRequest(UUID.randomUUID(), BUSINESS_KEY, NOW)))
                 .assertNext(order -> assertThat(order).isEqualTo(existing))
                 .verifyComplete();
 
-        verify(orderRepository, never()).save(any());
+        verify(this.orderRepository, never()).save(any());
     }
 
     @Test
     void confirmOrderAdvancesFromPendingToConfirmed() {
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder pending = CustomerOrder.create(sagaId, BUSINESS_KEY, NOW);
-        when(orderRepository.findById(sagaId)).thenReturn(Mono.just(pending));
+        when(this.orderRepository.findById(sagaId)).thenReturn(Mono.just(pending));
 
-        StepVerifier.create(service.confirmOrder(new ConfirmOrderRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.confirmOrder(new ConfirmOrderRequest(sagaId, NOW)))
                 .assertNext(order -> assertThat(order.status()).isEqualTo(OrderStatus.CONFIRMED))
                 .verifyComplete();
     }
@@ -85,21 +85,21 @@ class OrderProgressionServiceTest {
     void confirmOrderIsIdempotentWhenAlreadyConfirmed() {
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder confirmed = CustomerOrder.create(sagaId, BUSINESS_KEY, NOW).confirm(NOW);
-        when(orderRepository.findById(sagaId)).thenReturn(Mono.just(confirmed));
+        when(this.orderRepository.findById(sagaId)).thenReturn(Mono.just(confirmed));
 
-        StepVerifier.create(service.confirmOrder(new ConfirmOrderRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.confirmOrder(new ConfirmOrderRequest(sagaId, NOW)))
                 .assertNext(order -> assertThat(order.status()).isEqualTo(OrderStatus.CONFIRMED))
                 .verifyComplete();
 
-        verify(orderRepository, never()).save(any());
+        verify(this.orderRepository, never()).save(any());
     }
 
     @Test
     void confirmOrderFailsWhenTheOrderDoesNotExist() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderRepository.findById(sagaId)).thenReturn(Mono.empty());
+        when(this.orderRepository.findById(sagaId)).thenReturn(Mono.empty());
 
-        StepVerifier.create(service.confirmOrder(new ConfirmOrderRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.confirmOrder(new ConfirmOrderRequest(sagaId, NOW)))
                 .expectError(IllegalStateException.class)
                 .verify();
     }
@@ -108,9 +108,9 @@ class OrderProgressionServiceTest {
     void confirmingACancelledOrderThrows() {
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder cancelled = CustomerOrder.create(sagaId, BUSINESS_KEY, NOW).cancel(NOW);
-        when(orderRepository.findById(sagaId)).thenReturn(Mono.just(cancelled));
+        when(this.orderRepository.findById(sagaId)).thenReturn(Mono.just(cancelled));
 
-        StepVerifier.create(service.confirmOrder(new ConfirmOrderRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.confirmOrder(new ConfirmOrderRequest(sagaId, NOW)))
                 .expectError(IllegalOrderTransitionException.class)
                 .verify();
     }
@@ -119,22 +119,22 @@ class OrderProgressionServiceTest {
     void confirmOrderThrowsPermanentlyForTheConfirmationFailureMarkerWithoutTouchingPersistence() {
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder pending = CustomerOrder.create(sagaId, CONFIRMATION_FAILURE_BUSINESS_KEY, NOW);
-        when(orderRepository.findById(sagaId)).thenReturn(Mono.just(pending));
+        when(this.orderRepository.findById(sagaId)).thenReturn(Mono.just(pending));
 
-        StepVerifier.create(service.confirmOrder(new ConfirmOrderRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.confirmOrder(new ConfirmOrderRequest(sagaId, NOW)))
                 .expectError(PermanentSagaException.class)
                 .verify();
 
-        verify(orderRepository, never()).save(any());
+        verify(this.orderRepository, never()).save(any());
     }
 
     @Test
     void cancelOrderAdvancesFromPendingToCancelled() {
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder pending = CustomerOrder.create(sagaId, BUSINESS_KEY, NOW);
-        when(orderRepository.findById(sagaId)).thenReturn(Mono.just(pending));
+        when(this.orderRepository.findById(sagaId)).thenReturn(Mono.just(pending));
 
-        StepVerifier.create(service.cancelOrder(new CancelOrderRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.cancelOrder(new CancelOrderRequest(sagaId, NOW)))
                 .assertNext(order -> assertThat(order.status()).isEqualTo(OrderStatus.CANCELLED))
                 .verifyComplete();
     }
@@ -143,22 +143,22 @@ class OrderProgressionServiceTest {
     void cancelOrderIsIdempotentWhenAlreadyCancelled() {
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder cancelled = CustomerOrder.create(sagaId, BUSINESS_KEY, NOW).cancel(NOW);
-        when(orderRepository.findById(sagaId)).thenReturn(Mono.just(cancelled));
+        when(this.orderRepository.findById(sagaId)).thenReturn(Mono.just(cancelled));
 
-        StepVerifier.create(service.cancelOrder(new CancelOrderRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.cancelOrder(new CancelOrderRequest(sagaId, NOW)))
                 .assertNext(order -> assertThat(order.status()).isEqualTo(OrderStatus.CANCELLED))
                 .verifyComplete();
 
-        verify(orderRepository, never()).save(any());
+        verify(this.orderRepository, never()).save(any());
     }
 
     @Test
     void cancellingAConfirmedOrderThrows() {
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder confirmed = CustomerOrder.create(sagaId, BUSINESS_KEY, NOW).confirm(NOW);
-        when(orderRepository.findById(sagaId)).thenReturn(Mono.just(confirmed));
+        when(this.orderRepository.findById(sagaId)).thenReturn(Mono.just(confirmed));
 
-        StepVerifier.create(service.cancelOrder(new CancelOrderRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.cancelOrder(new CancelOrderRequest(sagaId, NOW)))
                 .expectError(IllegalOrderTransitionException.class)
                 .verify();
     }
@@ -166,9 +166,9 @@ class OrderProgressionServiceTest {
     @Test
     void cancelOrderFailsWhenTheOrderDoesNotExist() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderRepository.findById(sagaId)).thenReturn(Mono.empty());
+        when(this.orderRepository.findById(sagaId)).thenReturn(Mono.empty());
 
-        StepVerifier.create(service.cancelOrder(new CancelOrderRequest(sagaId, NOW)))
+        StepVerifier.create(this.service.cancelOrder(new CancelOrderRequest(sagaId, NOW)))
                 .expectError(IllegalStateException.class)
                 .verify();
     }
@@ -177,9 +177,9 @@ class OrderProgressionServiceTest {
     void getOrderReturnsTheOrderWhenItExists() {
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder pending = CustomerOrder.create(sagaId, BUSINESS_KEY, NOW);
-        when(orderRepository.findById(sagaId)).thenReturn(Mono.just(pending));
+        when(this.orderRepository.findById(sagaId)).thenReturn(Mono.just(pending));
 
-        StepVerifier.create(service.getOrder(sagaId))
+        StepVerifier.create(this.service.getOrder(sagaId))
                 .assertNext(order -> assertThat(order).isEqualTo(pending))
                 .verifyComplete();
     }
@@ -193,9 +193,9 @@ class OrderProgressionServiceTest {
     @Test
     void getOrderFailsWithOrderNotFoundExceptionWhenTheOrderDoesNotExist() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderRepository.findById(sagaId)).thenReturn(Mono.empty());
+        when(this.orderRepository.findById(sagaId)).thenReturn(Mono.empty());
 
-        StepVerifier.create(service.getOrder(sagaId))
+        StepVerifier.create(this.service.getOrder(sagaId))
                 .expectError(OrderNotFoundException.class)
                 .verify();
     }

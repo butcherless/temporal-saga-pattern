@@ -35,7 +35,7 @@ public enum PaymentStatus {
 
     /** Whether no further transition is possible from this state. */
     public boolean isTerminal() {
-        return allowedNextStates().isEmpty();
+        return this.allowedNextStates().isEmpty();
     }
 
     private static Map<PaymentStatus, Set<PaymentStatus>> buildTransitionGraph() {

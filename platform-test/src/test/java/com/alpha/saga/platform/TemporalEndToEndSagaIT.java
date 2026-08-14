@@ -123,7 +123,7 @@ class TemporalEndToEndSagaIT {
 
     @Test
     void postOrdersDrivesTheFullHappyPathSagaToCompleted() throws Exception {
-        postOrderAndAwaitConfirmed("SKU-001", 2, "49.99");
+        this.postOrderAndAwaitConfirmed("SKU-001", 2, "49.99");
     }
 
     /**
@@ -134,7 +134,7 @@ class TemporalEndToEndSagaIT {
      */
     @Test
     void postOrdersRetriesATemporaryInventoryFaultAndStillCompletes() throws Exception {
-        postOrderAndAwaitConfirmed(InventoryProgressionService.FLAKY_RESERVE_SKU, 2, "49.99");
+        this.postOrderAndAwaitConfirmed(InventoryProgressionService.FLAKY_RESERVE_SKU, 2, "49.99");
     }
 
     /**
@@ -148,7 +148,7 @@ class TemporalEndToEndSagaIT {
                 .isLessThan(new BigDecimal("2000.00"))
                 .isLessThan(PaymentProgressionService.HARD_DECLINE_THRESHOLD);
 
-        postOrderAndAwaitConfirmed("SKU-001", 2, "2000.00");
+        this.postOrderAndAwaitConfirmed("SKU-001", 2, "2000.00");
     }
 
     /**
@@ -160,7 +160,7 @@ class TemporalEndToEndSagaIT {
      */
     @Test
     void postOrdersFailsFastOnAPermanentInventoryFailure() throws Exception {
-        postOrderAndAwaitFailed("SKU-001", 999, "49.99");
+        this.postOrderAndAwaitFailed("SKU-001", 999, "49.99");
     }
 
     /**
@@ -171,7 +171,7 @@ class TemporalEndToEndSagaIT {
     void postOrdersFailsFastOnAPermanentPaymentDecline() throws Exception {
         assertThat(new BigDecimal("15000.00")).isGreaterThanOrEqualTo(PaymentProgressionService.HARD_DECLINE_THRESHOLD);
 
-        postOrderAndAwaitFailed("SKU-001", 2, "15000.00");
+        this.postOrderAndAwaitFailed("SKU-001", 2, "15000.00");
     }
 
     /**
@@ -184,7 +184,7 @@ class TemporalEndToEndSagaIT {
     void postOrdersFailsToReleaseStockAfterAPermanentPaymentDecline() throws Exception {
         assertThat(new BigDecimal("15000.00")).isGreaterThanOrEqualTo(PaymentProgressionService.HARD_DECLINE_THRESHOLD);
 
-        final String businessKey = postOrder(InventoryProgressionService.PERMANENT_RELEASE_FAILURE_SKU, 2, "15000.00");
+        final String businessKey = this.postOrder(InventoryProgressionService.PERMANENT_RELEASE_FAILURE_SKU, 2, "15000.00");
         final UUID sagaId = loadSagaId(businessKey);
 
         awaitWorkflowFailed(businessKey);
@@ -202,7 +202,7 @@ class TemporalEndToEndSagaIT {
     void postOrdersFailsToRefundAfterAPermanentOrderConfirmationFailure() throws Exception {
         final String businessKey = "ORDER-2026-E2E-%s-%s".formatted(
                 OrderProgressionService.PERMANENT_CONFIRMATION_FAILURE_MARKER, UUID.randomUUID());
-        assertThat(postOrderWithBusinessKey(
+        assertThat(this.postOrderWithBusinessKey(
                 businessKey, "SKU-001", 2, PaymentProgressionService.PERMANENT_REFUND_FAILURE_AMOUNT.toPlainString()))
                 .isEqualTo(202);
         final UUID sagaId = loadSagaId(businessKey);
@@ -222,7 +222,7 @@ class TemporalEndToEndSagaIT {
     void postOrdersCompensatesFullyAfterAPermanentOrderConfirmationFailure() throws Exception {
         final String businessKey = "ORDER-2026-E2E-%s-%s".formatted(
                 OrderProgressionService.PERMANENT_CONFIRMATION_FAILURE_MARKER, UUID.randomUUID());
-        assertThat(postOrderWithBusinessKey(businessKey, "SKU-001", 2, "250.00")).isEqualTo(202);
+        assertThat(this.postOrderWithBusinessKey(businessKey, "SKU-001", 2, "250.00")).isEqualTo(202);
         final UUID sagaId = loadSagaId(businessKey);
 
         awaitWorkflowFailed(businessKey);
@@ -234,7 +234,7 @@ class TemporalEndToEndSagaIT {
     private void postOrderAndAwaitConfirmed(final String sku,
             final int quantity,
             final String amount) throws Exception {
-        final String businessKey = postOrder(sku, quantity, amount);
+        final String businessKey = this.postOrder(sku, quantity, amount);
 
         awaitWorkflowCompleted(businessKey);
         awaitOrderStatus(businessKey, "CONFIRMED");
@@ -243,7 +243,7 @@ class TemporalEndToEndSagaIT {
     private void postOrderAndAwaitFailed(final String sku,
             final int quantity,
             final String amount) throws Exception {
-        final String businessKey = postOrder(sku, quantity, amount);
+        final String businessKey = this.postOrder(sku, quantity, amount);
 
         awaitWorkflowFailed(businessKey);
         assertOrderStatus(businessKey, "CANCELLED");
@@ -259,8 +259,8 @@ class TemporalEndToEndSagaIT {
     void postOrdersIsIdempotentOnADuplicateBusinessKey() throws Exception {
         final String businessKey = "ORDER-2026-E2E-%s".formatted(UUID.randomUUID());
 
-        assertThat(postOrderWithBusinessKey(businessKey, "SKU-001", 2, "49.99")).isEqualTo(202);
-        assertThat(postOrderWithBusinessKey(businessKey, "SKU-001", 2, "49.99")).isEqualTo(202);
+        assertThat(this.postOrderWithBusinessKey(businessKey, "SKU-001", 2, "49.99")).isEqualTo(202);
+        assertThat(this.postOrderWithBusinessKey(businessKey, "SKU-001", 2, "49.99")).isEqualTo(202);
 
         awaitWorkflowCompleted(businessKey);
         awaitOrderStatus(businessKey, "CONFIRMED");
@@ -270,7 +270,7 @@ class TemporalEndToEndSagaIT {
             final int quantity,
             final String amount) throws Exception {
         final String businessKey = "ORDER-2026-E2E-%s".formatted(UUID.randomUUID());
-        assertThat(postOrderWithBusinessKey(businessKey, sku, quantity, amount)).isEqualTo(202);
+        assertThat(this.postOrderWithBusinessKey(businessKey, sku, quantity, amount)).isEqualTo(202);
         return businessKey;
     }
 

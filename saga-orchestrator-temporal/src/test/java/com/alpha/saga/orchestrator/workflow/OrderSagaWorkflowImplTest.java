@@ -46,7 +46,7 @@ class OrderSagaWorkflowImplTest {
 
     @AfterEach
     void tearDown() {
-        testEnv.close();
+        this.testEnv.close();
     }
 
     @Test
@@ -54,10 +54,10 @@ class OrderSagaWorkflowImplTest {
         final UUID sagaId = UUID.randomUUID();
         final OrderSagaInput input = new OrderSagaInput(sagaId, "ORDER-2026-800001", "SKU-001", 5, new BigDecimal("49.99"));
 
-        final OrderSagaWorkflow workflow = newWorkflowStub(input.businessKey(), FakeActivities.builder(callLog).build());
+        final OrderSagaWorkflow workflow = this.newWorkflowStub(input.businessKey(), FakeActivities.builder(this.callLog).build());
         workflow.process(input);
 
-        assertThat(callLog).containsExactly(
+        assertThat(this.callLog).containsExactly(
                 "reserveStock(%s,SKU-001,5)".formatted(sagaId),
                 "requestPayment(%s,49.99)".formatted(sagaId),
                 "confirmOrder(%s)".formatted(sagaId),
@@ -76,11 +76,11 @@ class OrderSagaWorkflowImplTest {
         final UUID sagaId = UUID.randomUUID();
         final OrderSagaInput input = new OrderSagaInput(sagaId, "ORDER-2026-800002", "SKU-INPUTDATA-2", 5, new BigDecimal("49.99"));
 
-        final OrderSagaWorkflow workflow = newWorkflowStub(
-                input.businessKey(), FakeActivities.builder(callLog).failReserveStockOnFirstAttempt().build());
+        final OrderSagaWorkflow workflow = this.newWorkflowStub(
+                input.businessKey(), FakeActivities.builder(this.callLog).failReserveStockOnFirstAttempt().build());
         workflow.process(input);
 
-        assertThat(callLog).containsExactly(
+        assertThat(this.callLog).containsExactly(
                 "reserveStock(%s,SKU-INPUTDATA-2,5)".formatted(sagaId),
                 "reserveStock(%s,SKU-INPUTDATA-2,5)".formatted(sagaId),
                 "requestPayment(%s,49.99)".formatted(sagaId),
@@ -101,11 +101,11 @@ class OrderSagaWorkflowImplTest {
         final UUID sagaId = UUID.randomUUID();
         final OrderSagaInput input = new OrderSagaInput(sagaId, "ORDER-2026-800003", "SKU-001", 999, new BigDecimal("49.99"));
 
-        final OrderSagaWorkflow workflow = newWorkflowStub(
-                input.businessKey(), FakeActivities.builder(callLog).failReserveStockPermanently().build());
+        final OrderSagaWorkflow workflow = this.newWorkflowStub(
+                input.businessKey(), FakeActivities.builder(this.callLog).failReserveStockPermanently().build());
 
         assertThatThrownBy(() -> workflow.process(input)).isInstanceOf(WorkflowFailedException.class);
-        assertThat(callLog).containsExactly(
+        assertThat(this.callLog).containsExactly(
                 "reserveStock(%s,SKU-001,999)".formatted(sagaId),
                 "cancelOrder(%s)".formatted(sagaId));
         assertThat(workflow.getProgress()).isEqualTo(OrderSagaProgress.COMPENSATED);
@@ -123,11 +123,11 @@ class OrderSagaWorkflowImplTest {
         final UUID sagaId = UUID.randomUUID();
         final OrderSagaInput input = new OrderSagaInput(sagaId, "ORDER-2026-800004", "SKU-001", 5, new BigDecimal("49.99"));
 
-        final OrderSagaWorkflow workflow = newWorkflowStub(
-                input.businessKey(), FakeActivities.builder(callLog).failConfirmOrderPermanently().build());
+        final OrderSagaWorkflow workflow = this.newWorkflowStub(
+                input.businessKey(), FakeActivities.builder(this.callLog).failConfirmOrderPermanently().build());
 
         assertThatThrownBy(() -> workflow.process(input)).isInstanceOf(WorkflowFailedException.class);
-        assertThat(callLog).containsExactly(
+        assertThat(this.callLog).containsExactly(
                 "reserveStock(%s,SKU-001,5)".formatted(sagaId),
                 "requestPayment(%s,49.99)".formatted(sagaId),
                 "confirmOrder(%s)".formatted(sagaId),
@@ -147,12 +147,12 @@ class OrderSagaWorkflowImplTest {
         final UUID sagaId = UUID.randomUUID();
         final OrderSagaInput input = new OrderSagaInput(sagaId, "ORDER-2026-800005", "SKU-001", 5, new BigDecimal("49.99"));
 
-        final OrderSagaWorkflow workflow = newWorkflowStub(
+        final OrderSagaWorkflow workflow = this.newWorkflowStub(
                 input.businessKey(),
-                FakeActivities.builder(callLog).failRefundPaymentPermanently().failConfirmOrderPermanently().build());
+                FakeActivities.builder(this.callLog).failRefundPaymentPermanently().failConfirmOrderPermanently().build());
 
         assertThatThrownBy(() -> workflow.process(input)).isInstanceOf(WorkflowFailedException.class);
-        assertThat(callLog).containsExactly(
+        assertThat(this.callLog).containsExactly(
                 "reserveStock(%s,SKU-001,5)".formatted(sagaId),
                 "requestPayment(%s,49.99)".formatted(sagaId),
                 "confirmOrder(%s)".formatted(sagaId),
@@ -179,9 +179,9 @@ class OrderSagaWorkflowImplTest {
 
         final CountDownLatch requestPaymentStarted = new CountDownLatch(1);
         final CountDownLatch releaseRequestPayment = new CountDownLatch(1);
-        final OrderSagaWorkflow workflow = newWorkflowStub(
+        final OrderSagaWorkflow workflow = this.newWorkflowStub(
                 input.businessKey(),
-                FakeActivities.builder(callLog).blockRequestPaymentUntilReleased(requestPaymentStarted, releaseRequestPayment).build());
+                FakeActivities.builder(this.callLog).blockRequestPaymentUntilReleased(requestPaymentStarted, releaseRequestPayment).build());
 
         WorkflowClient.start(workflow::process, input);
         assertThat(requestPaymentStarted.await(10, TimeUnit.SECONDS)).isTrue();
@@ -192,7 +192,7 @@ class OrderSagaWorkflowImplTest {
         WorkflowStub.fromTyped(workflow).getResult(Void.class);
 
         assertThat(workflow.getProgress()).isEqualTo(OrderSagaProgress.COMPLETED);
-        assertThat(callLog).containsExactly(
+        assertThat(this.callLog).containsExactly(
                 "reserveStock(%s,SKU-001,5)".formatted(sagaId),
                 "requestPayment(%s,49.99)".formatted(sagaId),
                 "confirmOrder(%s)".formatted(sagaId),
@@ -201,12 +201,12 @@ class OrderSagaWorkflowImplTest {
 
     private OrderSagaWorkflow newWorkflowStub(final String businessKey,
             final FakeActivities activities) {
-        testEnv = TestWorkflowEnvironment.newInstance();
-        final Worker worker = testEnv.newWorker(TASK_QUEUE);
+        this.testEnv = TestWorkflowEnvironment.newInstance();
+        final Worker worker = this.testEnv.newWorker(TASK_QUEUE);
         worker.registerWorkflowImplementationTypes(OrderSagaWorkflowImpl.class);
         worker.registerActivitiesImplementations(activities);
-        testEnv.start();
-        return testEnv.getWorkflowClient().newWorkflowStub(
+        this.testEnv.start();
+        return this.testEnv.getWorkflowClient().newWorkflowStub(
                 OrderSagaWorkflow.class,
                 WorkflowOptions.newBuilder().setWorkflowId(businessKey).setTaskQueue(TASK_QUEUE).build());
     }
@@ -245,55 +245,55 @@ class OrderSagaWorkflowImplTest {
         public void reserveStock(final UUID sagaId,
                 final String sku,
                 final Integer quantity) {
-            callLog.add("reserveStock(%s,%s,%s)".formatted(sagaId, sku, quantity));
-            if (reserveStockFailsPermanently) {
+            this.callLog.add("reserveStock(%s,%s,%s)".formatted(sagaId, sku, quantity));
+            if (this.reserveStockFailsPermanently) {
                 throw ApplicationFailure.newNonRetryableFailure(
                         "Simulated permanent inventory failure for sku %s".formatted(sku), "PermanentSagaException");
             }
-            if (reserveStockFailsOnFirstAttempt && reserveStockAttempts.incrementAndGet() == 1) {
+            if (this.reserveStockFailsOnFirstAttempt && this.reserveStockAttempts.incrementAndGet() == 1) {
                 throw new IllegalStateException("Simulated inventory gateway timeout for sku %s".formatted(sku));
             }
         }
 
         @Override
         public void confirmReservation(final UUID sagaId) {
-            callLog.add("confirmReservation(%s)".formatted(sagaId));
+            this.callLog.add("confirmReservation(%s)".formatted(sagaId));
         }
 
         @Override
         public void releaseStock(final UUID sagaId) {
-            callLog.add("releaseStock(%s)".formatted(sagaId));
+            this.callLog.add("releaseStock(%s)".formatted(sagaId));
         }
 
         @Override
         public void requestPayment(final UUID sagaId,
                 final BigDecimal amount) {
-            callLog.add("requestPayment(%s,%s)".formatted(sagaId, amount));
-            if (requestPaymentStartedLatch != null) {
-                requestPaymentStartedLatch.countDown();
-                awaitUninterruptibly(requestPaymentReleaseLatch);
+            this.callLog.add("requestPayment(%s,%s)".formatted(sagaId, amount));
+            if (this.requestPaymentStartedLatch != null) {
+                this.requestPaymentStartedLatch.countDown();
+                awaitUninterruptibly(this.requestPaymentReleaseLatch);
             }
         }
 
         @Override
         public void refundPayment(final UUID sagaId) {
-            callLog.add("refundPayment(%s)".formatted(sagaId));
-            if (refundPaymentFailsPermanently) {
+            this.callLog.add("refundPayment(%s)".formatted(sagaId));
+            if (this.refundPaymentFailsPermanently) {
                 throw ApplicationFailure.newNonRetryableFailure("Simulated permanent refund failure", "PermanentSagaException");
             }
         }
 
         @Override
         public void confirmOrder(final UUID sagaId) {
-            callLog.add("confirmOrder(%s)".formatted(sagaId));
-            if (confirmOrderFailsPermanently) {
+            this.callLog.add("confirmOrder(%s)".formatted(sagaId));
+            if (this.confirmOrderFailsPermanently) {
                 throw ApplicationFailure.newNonRetryableFailure("Simulated permanent order confirmation failure", "PermanentSagaException");
             }
         }
 
         @Override
         public void cancelOrder(final UUID sagaId) {
-            callLog.add("cancelOrder(%s)".formatted(sagaId));
+            this.callLog.add("cancelOrder(%s)".formatted(sagaId));
         }
 
         private static void awaitUninterruptibly(final CountDownLatch latch) {

@@ -40,7 +40,7 @@ class OrderControllerTest {
 
     @BeforeEach
     void setUp() {
-        client = WebTestClient.bindToController(new OrderController(orderCreationHandler, orderProgressionService, orderQueryHandler))
+        this.client = WebTestClient.bindToController(new OrderController(this.orderCreationHandler, this.orderProgressionService, this.orderQueryHandler))
                 .controllerAdvice(new RestExceptionHandler())
                 .build();
     }
@@ -48,9 +48,9 @@ class OrderControllerTest {
     @Test
     void createOrderReturns202AcceptedWithTheResponseBody() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderCreationHandler.createOrder(any())).thenReturn(Mono.just(new CreateOrderResponseBody(sagaId, "ORDER-2026-600001")));
+        when(this.orderCreationHandler.createOrder(any())).thenReturn(Mono.just(new CreateOrderResponseBody(sagaId, "ORDER-2026-600001")));
 
-        client.post().uri("/orders")
+        this.client.post().uri("/orders")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sku":"SKU-001","quantity":5,"amount":49.99,"businessKey":"ORDER-2026-600001"}""")
@@ -63,7 +63,7 @@ class OrderControllerTest {
 
     @Test
     void createOrderRejectsAnInvalidRequestBodyWithAProblemDetail() {
-        final ResponseSpec response = client.post().uri("/orders")
+        final ResponseSpec response = this.client.post().uri("/orders")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sku":"SKU-001","quantity":-1,"amount":49.99}""")
@@ -76,9 +76,9 @@ class OrderControllerTest {
     void confirmOrderReturns200WithTheConfirmedStatus() {
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder confirmedOrder = CustomerOrder.create(sagaId, "ORDER-2026-600002", Instant.now()).confirm(Instant.now());
-        when(orderProgressionService.confirmOrder(any())).thenReturn(Mono.just(confirmedOrder));
+        when(this.orderProgressionService.confirmOrder(any())).thenReturn(Mono.just(confirmedOrder));
 
-        client.post().uri("/orders/{sagaId}/confirm", sagaId)
+        this.client.post().uri("/orders/{sagaId}/confirm", sagaId)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -90,9 +90,9 @@ class OrderControllerTest {
     void cancelOrderReturns200WithTheCancelledStatus() {
         final UUID sagaId = UUID.randomUUID();
         final CustomerOrder cancelledOrder = CustomerOrder.create(sagaId, "ORDER-2026-600003", Instant.now()).cancel(Instant.now());
-        when(orderProgressionService.cancelOrder(any())).thenReturn(Mono.just(cancelledOrder));
+        when(this.orderProgressionService.cancelOrder(any())).thenReturn(Mono.just(cancelledOrder));
 
-        client.post().uri("/orders/{sagaId}/cancel", sagaId)
+        this.client.post().uri("/orders/{sagaId}/cancel", sagaId)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -103,11 +103,11 @@ class OrderControllerTest {
     @Test
     void confirmOrderReturns422WhenTheConfirmationPermanentlyFails() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderProgressionService.confirmOrder(any()))
+        when(this.orderProgressionService.confirmOrder(any()))
                 .thenReturn(Mono.error(new PermanentSagaException(
                         "Simulated unrecoverable order confirmation failure for businessKey ORDER-2026-CONFIRMFAIL-INPUTDATA-7")));
 
-        final ResponseSpec response = client.post().uri("/orders/{sagaId}/confirm", sagaId).exchange();
+        final ResponseSpec response = this.client.post().uri("/orders/{sagaId}/confirm", sagaId).exchange();
 
         assertProblemDetail(response, 422, "Simulated unrecoverable order confirmation failure for businessKey ORDER-2026-CONFIRMFAIL-INPUTDATA-7");
     }
@@ -115,10 +115,10 @@ class OrderControllerTest {
     @Test
     void confirmOrderReturns503WhenTheGatewayTimesOut() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderProgressionService.confirmOrder(any()))
+        when(this.orderProgressionService.confirmOrder(any()))
                 .thenReturn(Mono.error(new TemporarySagaException("Simulated order confirmation gateway timeout")));
 
-        final ResponseSpec response = client.post().uri("/orders/{sagaId}/confirm", sagaId).exchange();
+        final ResponseSpec response = this.client.post().uri("/orders/{sagaId}/confirm", sagaId).exchange();
 
         assertProblemDetail(response, 503, "Simulated order confirmation gateway timeout");
     }
@@ -132,10 +132,10 @@ class OrderControllerTest {
     @Test
     void confirmOrderReturns500WhenTheOrderCannotLegallyBeConfirmed() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderProgressionService.confirmOrder(any()))
+        when(this.orderProgressionService.confirmOrder(any()))
                 .thenReturn(Mono.error(new IllegalOrderTransitionException(OrderStatus.CANCELLED, OrderStatus.CONFIRMED)));
 
-        client.post().uri("/orders/{sagaId}/confirm", sagaId)
+        this.client.post().uri("/orders/{sagaId}/confirm", sagaId)
                 .exchange()
                 .expectStatus().is5xxServerError();
     }
@@ -148,10 +148,10 @@ class OrderControllerTest {
     @Test
     void cancelOrderReturns500WhenTheOrderCannotLegallyBeCancelled() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderProgressionService.cancelOrder(any()))
+        when(this.orderProgressionService.cancelOrder(any()))
                 .thenReturn(Mono.error(new IllegalOrderTransitionException(OrderStatus.CONFIRMED, OrderStatus.CANCELLED)));
 
-        client.post().uri("/orders/{sagaId}/cancel", sagaId)
+        this.client.post().uri("/orders/{sagaId}/cancel", sagaId)
                 .exchange()
                 .expectStatus().is5xxServerError();
     }
@@ -159,10 +159,10 @@ class OrderControllerTest {
     @Test
     void getOrderStatusReturns200WithLiveProgressWhilePending() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderQueryHandler.getOrderStatus(sagaId))
+        when(this.orderQueryHandler.getOrderStatus(sagaId))
                 .thenReturn(Mono.just(new OrderStatusResponseBody(sagaId, OrderStatus.PENDING, OrderSagaProgress.PAYMENT_REQUESTED)));
 
-        client.get().uri("/orders/{sagaId}", sagaId)
+        this.client.get().uri("/orders/{sagaId}", sagaId)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -174,10 +174,10 @@ class OrderControllerTest {
     @Test
     void getOrderStatusReturns200WithCompletedProgressOnceConfirmed() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderQueryHandler.getOrderStatus(sagaId))
+        when(this.orderQueryHandler.getOrderStatus(sagaId))
                 .thenReturn(Mono.just(new OrderStatusResponseBody(sagaId, OrderStatus.CONFIRMED, OrderSagaProgress.COMPLETED)));
 
-        client.get().uri("/orders/{sagaId}", sagaId)
+        this.client.get().uri("/orders/{sagaId}", sagaId)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -188,9 +188,9 @@ class OrderControllerTest {
     @Test
     void getOrderStatusReturns404WhenTheOrderDoesNotExist() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderQueryHandler.getOrderStatus(sagaId)).thenReturn(Mono.error(new OrderNotFoundException(sagaId)));
+        when(this.orderQueryHandler.getOrderStatus(sagaId)).thenReturn(Mono.error(new OrderNotFoundException(sagaId)));
 
-        final ResponseSpec response = client.get().uri("/orders/{sagaId}", sagaId).exchange();
+        final ResponseSpec response = this.client.get().uri("/orders/{sagaId}", sagaId).exchange();
 
         assertProblemDetail(response, 404, "Order not found: %s".formatted(sagaId));
     }
@@ -203,10 +203,10 @@ class OrderControllerTest {
     @Test
     void getOrderStatusReturns503WhenTheWorkflowQueryFails() {
         final UUID sagaId = UUID.randomUUID();
-        when(orderQueryHandler.getOrderStatus(sagaId))
+        when(this.orderQueryHandler.getOrderStatus(sagaId))
                 .thenReturn(Mono.error(new TemporarySagaException("Saga progress temporarily unavailable for sagaId %s".formatted(sagaId))));
 
-        final ResponseSpec response = client.get().uri("/orders/{sagaId}", sagaId).exchange();
+        final ResponseSpec response = this.client.get().uri("/orders/{sagaId}", sagaId).exchange();
 
         assertProblemDetail(response, 503, "Saga progress temporarily unavailable for sagaId %s".formatted(sagaId));
     }

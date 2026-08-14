@@ -53,19 +53,19 @@ public class OrderSagaWorkflowImpl implements OrderSagaWorkflow {
         // release compensation from still being attempted afterward.
         final Saga saga = new Saga(new Saga.Options.Builder().setContinueWithError(true).build());
         try {
-            inventoryActivities.reserveStock(input.sagaId(), input.sku(), input.quantity());
-            saga.addCompensation(inventoryActivities::releaseStock, input.sagaId());
-            progress = OrderSagaProgress.INVENTORY_RESERVED;
+            this.inventoryActivities.reserveStock(input.sagaId(), input.sku(), input.quantity());
+            saga.addCompensation(this.inventoryActivities::releaseStock, input.sagaId());
+            this.progress = OrderSagaProgress.INVENTORY_RESERVED;
 
-            paymentActivities.requestPayment(input.sagaId(), input.amount());
-            saga.addCompensation(paymentActivities::refundPayment, input.sagaId());
-            progress = OrderSagaProgress.PAYMENT_REQUESTED;
+            this.paymentActivities.requestPayment(input.sagaId(), input.amount());
+            saga.addCompensation(this.paymentActivities::refundPayment, input.sagaId());
+            this.progress = OrderSagaProgress.PAYMENT_REQUESTED;
 
-            orderActivities.confirmOrder(input.sagaId());
-            inventoryActivities.confirmReservation(input.sagaId());
-            progress = OrderSagaProgress.COMPLETED;
+            this.orderActivities.confirmOrder(input.sagaId());
+            this.inventoryActivities.confirmReservation(input.sagaId());
+            this.progress = OrderSagaProgress.COMPLETED;
         } catch (final RuntimeException error) {
-            progress = OrderSagaProgress.COMPENSATING;
+            this.progress = OrderSagaProgress.COMPENSATING;
             // Compensations run in reverse order (refund before release). If they all succeed,
             // saga.compensate() returns normally — the original error is rethrown explicitly so
             // the Workflow Execution still fails instead of looking like it succeeded.
@@ -73,14 +73,14 @@ public class OrderSagaWorkflowImpl implements OrderSagaWorkflow {
             // Whatever failed, the order itself never reached CONFIRMED — cancelling it here is
             // what turns that dangling PENDING into a correct terminal state, for every failure
             // path (not just the ones that also unwind inventory/payment).
-            orderActivities.cancelOrder(input.sagaId());
-            progress = OrderSagaProgress.COMPENSATED;
+            this.orderActivities.cancelOrder(input.sagaId());
+            this.progress = OrderSagaProgress.COMPENSATED;
             throw error;
         }
     }
 
     @Override
     public OrderSagaProgress getProgress() {
-        return progress;
+        return this.progress;
     }
 }

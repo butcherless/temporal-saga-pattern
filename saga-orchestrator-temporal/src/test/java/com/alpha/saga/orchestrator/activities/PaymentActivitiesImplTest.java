@@ -25,24 +25,24 @@ class PaymentActivitiesImplTest {
 
     @BeforeEach
     void setUp() {
-        activities = new PaymentActivitiesImpl(ExchangeFunctionStub.webClientFor(exchangeFunction));
-        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.CREATED);
+        this.activities = new PaymentActivitiesImpl(ExchangeFunctionStub.webClientFor(this.exchangeFunction));
+        ExchangeFunctionStub.stubResponse(this.exchangeFunction, HttpStatus.CREATED);
     }
 
     @Test
     void requestPaymentPostsToThePaymentsEndpoint() {
         final UUID sagaId = UUID.randomUUID();
 
-        activities.requestPayment(sagaId, new BigDecimal("49.99"));
+        this.activities.requestPayment(sagaId, new BigDecimal("49.99"));
 
-        ExchangeFunctionStub.assertPostedTo(exchangeFunction, "/payments");
+        ExchangeFunctionStub.assertPostedTo(this.exchangeFunction, "/payments");
     }
 
     @Test
     void requestPaymentThrowsANonRetryableFailureWhenTheGatewayPermanentlyDeclinesThePayment() {
-        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Payment declined for amount 15000.00");
+        ExchangeFunctionStub.stubResponse(this.exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Payment declined for amount 15000.00");
 
-        assertThatThrownBy(() -> activities.requestPayment(UUID.randomUUID(), new BigDecimal("15000.00")))
+        assertThatThrownBy(() -> this.activities.requestPayment(UUID.randomUUID(), new BigDecimal("15000.00")))
                 .isInstanceOf(ApplicationFailure.class)
                 .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
                 .isEqualTo(true);
@@ -56,9 +56,9 @@ class PaymentActivitiesImplTest {
      */
     @Test
     void requestPaymentRethrowsUnchangedWhenTheFailureIsNotPermanent() {
-        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.SERVICE_UNAVAILABLE, "Payment gateway timeout for amount 2000.00");
+        ExchangeFunctionStub.stubResponse(this.exchangeFunction, HttpStatus.SERVICE_UNAVAILABLE, "Payment gateway timeout for amount 2000.00");
 
-        assertThatThrownBy(() -> activities.requestPayment(UUID.randomUUID(), new BigDecimal("2000.00")))
+        assertThatThrownBy(() -> this.activities.requestPayment(UUID.randomUUID(), new BigDecimal("2000.00")))
                 .isInstanceOf(WebClientResponseException.class)
                 .isNotInstanceOf(ApplicationFailure.class);
     }
@@ -66,19 +66,19 @@ class PaymentActivitiesImplTest {
     @Test
     void refundPaymentPostsToTheRefundEndpointForTheGivenSagaId() {
         final UUID sagaId = UUID.randomUUID();
-        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.OK);
+        ExchangeFunctionStub.stubResponse(this.exchangeFunction, HttpStatus.OK);
 
-        activities.refundPayment(sagaId);
+        this.activities.refundPayment(sagaId);
 
-        ExchangeFunctionStub.assertPostedTo(exchangeFunction, "/payments/%s/refund".formatted(sagaId));
+        ExchangeFunctionStub.assertPostedTo(this.exchangeFunction, "/payments/%s/refund".formatted(sagaId));
     }
 
     @Test
     void refundPaymentThrowsANonRetryableFailureWhenTheRefundIsPermanentlyUnrecoverable() {
         ExchangeFunctionStub.stubResponse(
-                exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Simulated unrecoverable refund failure for amount 750.00");
+                this.exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Simulated unrecoverable refund failure for amount 750.00");
 
-        assertThatThrownBy(() -> activities.refundPayment(UUID.randomUUID()))
+        assertThatThrownBy(() -> this.activities.refundPayment(UUID.randomUUID()))
                 .isInstanceOf(ApplicationFailure.class)
                 .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
                 .isEqualTo(true);

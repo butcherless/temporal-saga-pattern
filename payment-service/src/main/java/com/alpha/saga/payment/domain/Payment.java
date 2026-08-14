@@ -51,7 +51,7 @@ public record Payment(
     /** Records another attempt at the same request, without changing {@code status}. */
     public Payment retry(final Instant now) {
         Objects.requireNonNull(now, "now must not be null");
-        return new Payment(id, amount, status, attempt + 1, createdAt, now, version);
+        return new Payment(this.id, this.amount, this.status, this.attempt + 1, this.createdAt, now, this.version);
     }
 
     /**
@@ -60,7 +60,7 @@ public record Payment(
      * @throws IllegalPaymentTransitionException if {@code status} cannot transition to {@link PaymentStatus#COMPLETED}
      */
     public Payment complete(final Instant now) {
-        return advanceTo(PaymentStatus.COMPLETED, now);
+        return this.advanceTo(PaymentStatus.COMPLETED, now);
     }
 
     /**
@@ -69,7 +69,7 @@ public record Payment(
      * @throws IllegalPaymentTransitionException if {@code status} cannot transition to {@link PaymentStatus#FAILED}
      */
     public Payment fail(final Instant now) {
-        return advanceTo(PaymentStatus.FAILED, now);
+        return this.advanceTo(PaymentStatus.FAILED, now);
     }
 
     /**
@@ -78,15 +78,15 @@ public record Payment(
      * @throws IllegalPaymentTransitionException if {@code status} cannot transition to {@link PaymentStatus#REFUNDED}
      */
     public Payment refund(final Instant now) {
-        return advanceTo(PaymentStatus.REFUNDED, now);
+        return this.advanceTo(PaymentStatus.REFUNDED, now);
     }
 
     private Payment advanceTo(final PaymentStatus target,
             final Instant now) {
         Objects.requireNonNull(now, "now must not be null");
-        if (!status.canTransitionTo(target)) {
-            throw new IllegalPaymentTransitionException(status, target);
+        if (!this.status.canTransitionTo(target)) {
+            throw new IllegalPaymentTransitionException(this.status, target);
         }
-        return new Payment(id, amount, target, attempt, createdAt, now, version);
+        return new Payment(this.id, this.amount, target, this.attempt, this.createdAt, now, this.version);
     }
 }

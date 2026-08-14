@@ -24,26 +24,26 @@ class OrderActivitiesImplTest {
 
     @BeforeEach
     void setUp() {
-        activities = new OrderActivitiesImpl(ExchangeFunctionStub.webClientFor(exchangeFunction));
-        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.OK);
+        this.activities = new OrderActivitiesImpl(ExchangeFunctionStub.webClientFor(this.exchangeFunction));
+        ExchangeFunctionStub.stubResponse(this.exchangeFunction, HttpStatus.OK);
     }
 
     @Test
     void confirmOrderPostsToTheConfirmEndpointForTheGivenSagaId() {
         final UUID sagaId = UUID.randomUUID();
 
-        activities.confirmOrder(sagaId);
+        this.activities.confirmOrder(sagaId);
 
-        ExchangeFunctionStub.assertPostedTo(exchangeFunction, "/orders/%s/confirm".formatted(sagaId));
+        ExchangeFunctionStub.assertPostedTo(this.exchangeFunction, "/orders/%s/confirm".formatted(sagaId));
     }
 
     @Test
     void confirmOrderThrowsANonRetryableFailureWhenTheConfirmationPermanentlyFails() {
         ExchangeFunctionStub.stubResponse(
-                exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT,
+                this.exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT,
                 "Simulated unrecoverable order confirmation failure for businessKey ORDER-2026-CONFIRMFAIL-INPUTDATA-7");
 
-        assertThatThrownBy(() -> activities.confirmOrder(UUID.randomUUID()))
+        assertThatThrownBy(() -> this.activities.confirmOrder(UUID.randomUUID()))
                 .isInstanceOf(ApplicationFailure.class)
                 .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
                 .isEqualTo(true);
@@ -57,9 +57,9 @@ class OrderActivitiesImplTest {
      */
     @Test
     void confirmOrderRethrowsUnchangedWhenTheFailureIsNotPermanent() {
-        ExchangeFunctionStub.stubResponse(exchangeFunction, HttpStatus.SERVICE_UNAVAILABLE, "Simulated order confirmation gateway timeout");
+        ExchangeFunctionStub.stubResponse(this.exchangeFunction, HttpStatus.SERVICE_UNAVAILABLE, "Simulated order confirmation gateway timeout");
 
-        assertThatThrownBy(() -> activities.confirmOrder(UUID.randomUUID()))
+        assertThatThrownBy(() -> this.activities.confirmOrder(UUID.randomUUID()))
                 .isInstanceOf(WebClientResponseException.class)
                 .isNotInstanceOf(ApplicationFailure.class);
     }
@@ -68,8 +68,8 @@ class OrderActivitiesImplTest {
     void cancelOrderPostsToTheCancelEndpointForTheGivenSagaId() {
         final UUID sagaId = UUID.randomUUID();
 
-        activities.cancelOrder(sagaId);
+        this.activities.cancelOrder(sagaId);
 
-        ExchangeFunctionStub.assertPostedTo(exchangeFunction, "/orders/%s/cancel".formatted(sagaId));
+        ExchangeFunctionStub.assertPostedTo(this.exchangeFunction, "/orders/%s/cancel".formatted(sagaId));
     }
 }

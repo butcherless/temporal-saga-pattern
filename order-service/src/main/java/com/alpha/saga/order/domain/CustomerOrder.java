@@ -50,7 +50,7 @@ public record CustomerOrder(
      * @throws IllegalOrderTransitionException if {@code status} cannot transition to {@link OrderStatus#CONFIRMED}
      */
     public CustomerOrder confirm(final Instant now) {
-        return advanceTo(OrderStatus.CONFIRMED, now);
+        return this.advanceTo(OrderStatus.CONFIRMED, now);
     }
 
     /**
@@ -59,15 +59,15 @@ public record CustomerOrder(
      * @throws IllegalOrderTransitionException if {@code status} cannot transition to {@link OrderStatus#CANCELLED}
      */
     public CustomerOrder cancel(final Instant now) {
-        return advanceTo(OrderStatus.CANCELLED, now);
+        return this.advanceTo(OrderStatus.CANCELLED, now);
     }
 
     private CustomerOrder advanceTo(final OrderStatus target,
             final Instant now) {
         Objects.requireNonNull(now, "now must not be null");
-        if (!status.canTransitionTo(target)) {
-            throw new IllegalOrderTransitionException(status, target);
+        if (!this.status.canTransitionTo(target)) {
+            throw new IllegalOrderTransitionException(this.status, target);
         }
-        return new CustomerOrder(id, businessKey, target, createdAt, now, version);
+        return new CustomerOrder(this.id, this.businessKey, target, this.createdAt, now, this.version);
     }
 }

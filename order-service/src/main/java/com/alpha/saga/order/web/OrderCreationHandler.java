@@ -46,8 +46,8 @@ public class OrderCreationHandler {
         final String businessKey = request.hasNoBusinessKey() ? sagaId.toString() : request.businessKey();
         final Instant now = Instant.now();
 
-        return orderProgressionService.createOrder(new CreateOrderRequest(sagaId, businessKey, now))
-                .flatMap(order -> startSagaIfNewlyCreated(order, sagaId, request)
+        return this.orderProgressionService.createOrder(new CreateOrderRequest(sagaId, businessKey, now))
+                .flatMap(order -> this.startSagaIfNewlyCreated(order, sagaId, request)
                         .thenReturn(new CreateOrderResponseBody(order.id(), order.businessKey())));
     }
 
@@ -66,7 +66,7 @@ public class OrderCreationHandler {
             return Mono.empty();
         }
 
-        final OrderSagaWorkflow workflow = workflowClient.newWorkflowStub(
+        final OrderSagaWorkflow workflow = this.workflowClient.newWorkflowStub(
                 OrderSagaWorkflow.class,
                 WorkflowOptions.newBuilder()
                         .setWorkflowId(order.businessKey())
@@ -76,7 +76,7 @@ public class OrderCreationHandler {
 
         // WorkflowClient.start is a blocking gRPC call; run it off the WebFlux event loop.
         return Mono.fromRunnable(() -> WorkflowClient.start(workflow::process, input))
-                .subscribeOn(blockingCallScheduler)
+                .subscribeOn(this.blockingCallScheduler)
                 .onErrorResume(WorkflowExecutionAlreadyStarted.class, _ -> Mono.empty())
                 .then();
     }

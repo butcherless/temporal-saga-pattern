@@ -56,11 +56,11 @@ public class PaymentProgressionService {
      */
     public Mono<Payment> requestPayment(final RequestPaymentRequest request) {
         log.debug("requestPayment - {}", request);
-        return paymentRepository.findById(request.sagaId())
+        return this.paymentRepository.findById(request.sagaId())
                 .flatMap(existing -> existing.status() == PaymentStatus.PENDING
-                        ? evaluate(existing.retry(request.now()), request.now())
+                        ? this.evaluate(existing.retry(request.now()), request.now())
                         : Mono.just(existing))
-                .switchIfEmpty(Mono.defer(() -> evaluate(
+                .switchIfEmpty(Mono.defer(() -> this.evaluate(
                         Payment.request(request.sagaId(), request.amount(), request.now()), request.now())));
     }
 
@@ -72,11 +72,11 @@ public class PaymentProgressionService {
      */
     public Mono<Payment> refundPayment(final RefundPaymentRequest request) {
         log.debug("refundPayment - {}", request);
-        return loadPayment(request.sagaId())
+        return this.loadPayment(request.sagaId())
                 .flatMap(payment -> payment.status() == PaymentStatus.REFUNDED
                         ? Mono.just(payment)
-                        : simulateRefundFault(payment)
-                                .then(Mono.defer(() -> paymentRepository.save(payment.refund(request.now())))));
+                        : this.simulateRefundFault(payment)
+                                .then(Mono.defer(() -> this.paymentRepository.save(payment.refund(request.now())))));
     }
 
     /**
@@ -88,8 +88,8 @@ public class PaymentProgressionService {
      */
     public Mono<PartialRefund> issuePartialRefund(final IssuePartialRefundRequest request) {
         log.debug("issuePartialRefund - {}", request);
-        return partialRefundRepository.findById(request.sagaId())
-                .switchIfEmpty(Mono.defer(() -> partialRefundRepository.save(
+        return this.partialRefundRepository.findById(request.sagaId())
+                .switchIfEmpty(Mono.defer(() -> this.partialRefundRepository.save(
                         new PartialRefund(request.sagaId(), request.sagaId(), request.amount(), request.now(), null))));
     }
 
@@ -97,14 +97,14 @@ public class PaymentProgressionService {
             final Instant now) {
         final BigDecimal amount = candidate.amount();
         if (amount.compareTo(HARD_DECLINE_THRESHOLD) >= 0) {
-            return paymentRepository.save(candidate.fail(now))
+            return this.paymentRepository.save(candidate.fail(now))
                     .then(Mono.error(new PermanentSagaException("Payment declined for amount %s".formatted(amount))));
         }
         if (amount.compareTo(FLAKY_THRESHOLD) >= 0 && candidate.attempt() == 1) {
-            return paymentRepository.save(candidate)
+            return this.paymentRepository.save(candidate)
                     .then(Mono.error(new TemporarySagaException("Payment gateway timeout for amount %s".formatted(amount))));
         }
-        return paymentRepository.save(candidate.complete(now));
+        return this.paymentRepository.save(candidate.complete(now));
     }
 
     /** PoC fault injection for §17.3 scenario 8: always throws before persisting a refund for {@link #PERMANENT_REFUND_FAILURE_AMOUNT}. */
@@ -115,7 +115,7 @@ public class PaymentProgressionService {
     }
 
     private Mono<Payment> loadPayment(final UUID sagaId) {
-        return paymentRepository.findById(sagaId)
+        return this.paymentRepository.findById(sagaId)
                 .switchIfEmpty(Mono.error(() -> new IllegalStateException("Payment not found: %s".formatted(sagaId))));
     }
 }

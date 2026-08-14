@@ -27,7 +27,7 @@ public class PaymentActivitiesImpl implements PaymentActivities {
     public void requestPayment(final UUID sagaId,
             final BigDecimal amount) {
         log.debug("requestPayment - sagaId={}, amount={}", sagaId, amount);
-        paymentWebClient.post()
+        this.paymentWebClient.post()
                 .uri("/payments")
                 .bodyValue(new PaymentChargeRequest(sagaId, amount))
                 .retrieve()
@@ -52,7 +52,7 @@ public class PaymentActivitiesImpl implements PaymentActivities {
     @Override
     public void refundPayment(final UUID sagaId) {
         log.debug("refundPayment - sagaId={}", sagaId);
-        paymentWebClient.post()
+        this.paymentWebClient.post()
                 .uri("/payments/{sagaId}/refund", sagaId)
                 .retrieve()
                 .toBodilessEntity()

@@ -44,8 +44,8 @@ public class OrderProgressionService {
     public Mono<CustomerOrder> createOrder(final CreateOrderRequest request) {
         log.debug("createOrder - {}", request);
 
-        return orderRepository.findByBusinessKey(request.businessKey())
-                .switchIfEmpty(Mono.defer(() -> orderRepository.save(
+        return this.orderRepository.findByBusinessKey(request.businessKey())
+                .switchIfEmpty(Mono.defer(() -> this.orderRepository.save(
                         CustomerOrder.create(request.sagaId(), request.businessKey(), request.now()))));
     }
 
@@ -57,11 +57,11 @@ public class OrderProgressionService {
      */
     public Mono<CustomerOrder> confirmOrder(final ConfirmOrderRequest request) {
         log.debug("confirmOrder - {}", request);
-        return loadOrder(request.sagaId())
+        return this.loadOrder(request.sagaId())
                 .flatMap(order -> OrderStatus.CONFIRMED.equals(order.status())
                         ? Mono.just(order)
-                        : simulateConfirmFault(order)
-                        .then(Mono.defer(() -> orderRepository.save(order.confirm(request.now())))));
+                        : this.simulateConfirmFault(order)
+                        .then(Mono.defer(() -> this.orderRepository.save(order.confirm(request.now())))));
     }
 
     /**
@@ -71,10 +71,10 @@ public class OrderProgressionService {
      */
     public Mono<CustomerOrder> cancelOrder(final CancelOrderRequest request) {
         log.debug("cancelOrder - {}", request);
-        return loadOrder(request.sagaId())
+        return this.loadOrder(request.sagaId())
                 .flatMap(order -> order.status() == OrderStatus.CANCELLED
                         ? Mono.just(order)
-                        : orderRepository.save(order.cancel(request.now())));
+                        : this.orderRepository.save(order.cancel(request.now())));
     }
 
     /**
@@ -85,7 +85,7 @@ public class OrderProgressionService {
      */
     public Mono<CustomerOrder> getOrder(final UUID sagaId) {
         log.debug("getOrder - {}", sagaId);
-        return orderRepository.findById(sagaId)
+        return this.orderRepository.findById(sagaId)
                 .switchIfEmpty(Mono.error(() -> new OrderNotFoundException(sagaId)));
     }
 
@@ -100,7 +100,7 @@ public class OrderProgressionService {
     }
 
     private Mono<CustomerOrder> loadOrder(final UUID sagaId) {
-        return orderRepository.findById(sagaId)
+        return this.orderRepository.findById(sagaId)
                 .switchIfEmpty(Mono.error(() -> new IllegalStateException("Order not found: %s".formatted(sagaId))));
     }
 }

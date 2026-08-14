@@ -37,17 +37,17 @@ public record StockItem(@Id String sku,
      */
     public StockItem reserve(final int quantity) {
         requirePositiveQuantity(quantity);
-        if (quantity > availableQuantity) {
+        if (quantity > this.availableQuantity) {
             throw new PermanentSagaException(
-                    "Insufficient stock for %s: requested %d, available %d".formatted(sku, quantity, availableQuantity));
+                    "Insufficient stock for %s: requested %d, available %d".formatted(this.sku, quantity, this.availableQuantity));
         }
-        return new StockItem(sku, availableQuantity - quantity, version);
+        return new StockItem(this.sku, this.availableQuantity - quantity, this.version);
     }
 
     /** Credits {@code quantity} back to the available stock (compensation). */
     public StockItem release(final int quantity) {
         requirePositiveQuantity(quantity);
-        return new StockItem(sku, availableQuantity + quantity, version);
+        return new StockItem(this.sku, this.availableQuantity + quantity, this.version);
     }
 
     private static void requirePositiveQuantity(final int quantity) {

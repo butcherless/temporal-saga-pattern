@@ -45,31 +45,31 @@ class OrderCreationHandlerTest {
 
     @BeforeEach
     void setUp() {
-        testEnv = TestWorkflowEnvironment.newInstance();
-        handler = new OrderCreationHandler(orderProgressionService, testEnv.getWorkflowClient(), Schedulers.immediate());
+        this.testEnv = TestWorkflowEnvironment.newInstance();
+        this.handler = new OrderCreationHandler(this.orderProgressionService, this.testEnv.getWorkflowClient(), Schedulers.immediate());
     }
 
     @AfterEach
     void tearDown() {
-        testEnv.close();
+        this.testEnv.close();
     }
 
     @Test
     void createOrderStartsTheSagaWorkflowWithTheOrderPayloadAndBusinessKeyAsWorkflowId() {
         final AtomicReference<OrderSagaInput> receivedInput = new AtomicReference<>();
-        registerFakeWorkflow(receivedInput);
+        this.registerFakeWorkflow(receivedInput);
 
         final CreateOrderRequestBody request = new CreateOrderRequestBody("SKU-001", 5, new BigDecimal("49.99"), "ORDER-2026-700001");
-        when(orderProgressionService.createOrder(any())).thenAnswer(invocation -> {
+        when(this.orderProgressionService.createOrder(any())).thenAnswer(invocation -> {
             final CreateOrderRequest req = invocation.getArgument(0);
             return Mono.just(CustomerOrder.create(req.sagaId(), req.businessKey(), req.now()));
         });
 
-        StepVerifier.create(handler.createOrder(request))
+        StepVerifier.create(this.handler.createOrder(request))
                 .assertNext(response -> assertThat(response.businessKey()).isEqualTo("ORDER-2026-700001"))
                 .verifyComplete();
 
-        final WorkflowStub startedWorkflow = testEnv.getWorkflowClient().newUntypedWorkflowStub("ORDER-2026-700001");
+        final WorkflowStub startedWorkflow = this.testEnv.getWorkflowClient().newUntypedWorkflowStub("ORDER-2026-700001");
         startedWorkflow.getResult(Void.class);
 
         assertThat(receivedInput.get().businessKey()).isEqualTo("ORDER-2026-700001");
@@ -81,9 +81,9 @@ class OrderCreationHandlerTest {
     @Test
     void createOrderPropagatesUncaughtErrorsWithoutStartingTheWorkflow() {
         final CreateOrderRequestBody request = new CreateOrderRequestBody("SKU-001", 5, new BigDecimal("49.99"), null);
-        when(orderProgressionService.createOrder(any())).thenReturn(Mono.error(new IllegalStateException("boom")));
+        when(this.orderProgressionService.createOrder(any())).thenReturn(Mono.error(new IllegalStateException("boom")));
 
-        StepVerifier.create(handler.createOrder(request))
+        StepVerifier.create(this.handler.createOrder(request))
                 .expectError(IllegalStateException.class)
                 .verify();
     }
@@ -99,11 +99,11 @@ class OrderCreationHandlerTest {
     void createOrderSkipsStartingTheWorkflowWhenTheOrderAlreadyExisted() {
         final WorkflowClient mockWorkflowClient = mock(WorkflowClient.class);
         final OrderCreationHandler handlerWithMockClient =
-                new OrderCreationHandler(orderProgressionService, mockWorkflowClient, Schedulers.immediate());
+                new OrderCreationHandler(this.orderProgressionService, mockWorkflowClient, Schedulers.immediate());
 
         final CreateOrderRequestBody request = new CreateOrderRequestBody("SKU-001", 5, new BigDecimal("49.99"), "ORDER-2026-700002");
         final CustomerOrder preExistingOrder = CustomerOrder.create(UUID.randomUUID(), "ORDER-2026-700002", Instant.now());
-        when(orderProgressionService.createOrder(any())).thenReturn(Mono.just(preExistingOrder));
+        when(this.orderProgressionService.createOrder(any())).thenReturn(Mono.just(preExistingOrder));
 
         StepVerifier.create(handlerWithMockClient.createOrder(request))
                 .assertNext(response -> assertThat(response.businessKey()).isEqualTo("ORDER-2026-700002"))
@@ -123,31 +123,31 @@ class OrderCreationHandlerTest {
     @Test
     void createOrderSwallowsWorkflowExecutionAlreadyStartedAsAnIdempotentNoOp() {
         final AtomicReference<OrderSagaInput> receivedInput = new AtomicReference<>();
-        registerFakeWorkflow(receivedInput);
+        this.registerFakeWorkflow(receivedInput);
 
         final String businessKey = "ORDER-2026-700003";
-        final OrderSagaWorkflow alreadyRunning = testEnv.getWorkflowClient().newWorkflowStub(
+        final OrderSagaWorkflow alreadyRunning = this.testEnv.getWorkflowClient().newWorkflowStub(
                 OrderSagaWorkflow.class,
                 WorkflowOptions.newBuilder().setWorkflowId(businessKey).setTaskQueue(SagaTaskQueues.ORDER_SAGA).build());
         WorkflowClient.start(alreadyRunning::process,
                 new OrderSagaInput(UUID.randomUUID(), businessKey, FakeOrderSagaWorkflow.BLOCK_FOREVER_SKU, 5, new BigDecimal("49.99")));
 
         final CreateOrderRequestBody request = new CreateOrderRequestBody("SKU-001", 5, new BigDecimal("49.99"), businessKey);
-        when(orderProgressionService.createOrder(any())).thenAnswer(invocation -> {
+        when(this.orderProgressionService.createOrder(any())).thenAnswer(invocation -> {
             final CreateOrderRequest req = invocation.getArgument(0);
             return Mono.just(CustomerOrder.create(req.sagaId(), req.businessKey(), req.now()));
         });
 
-        StepVerifier.create(handler.createOrder(request))
+        StepVerifier.create(this.handler.createOrder(request))
                 .assertNext(response -> assertThat(response.businessKey()).isEqualTo(businessKey))
                 .verifyComplete();
     }
 
     private void registerFakeWorkflow(final AtomicReference<OrderSagaInput> receivedInput) {
-        final Worker worker = testEnv.newWorker(SagaTaskQueues.ORDER_SAGA);
+        final Worker worker = this.testEnv.newWorker(SagaTaskQueues.ORDER_SAGA);
         worker.registerWorkflowImplementationTypes(FakeOrderSagaWorkflow.class);
         FakeOrderSagaWorkflow.receivedInput = receivedInput;
-        testEnv.start();
+        this.testEnv.start();
     }
 
     public static class FakeOrderSagaWorkflow implements OrderSagaWorkflow {

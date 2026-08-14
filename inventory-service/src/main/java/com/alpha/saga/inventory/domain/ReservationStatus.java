@@ -34,7 +34,7 @@ public enum ReservationStatus {
 
     /** Whether no further transition is possible from this state. */
     public boolean isTerminal() {
-        return allowedNextStates().isEmpty();
+        return this.allowedNextStates().isEmpty();
     }
 
     private static Map<ReservationStatus, Set<ReservationStatus>> buildTransitionGraph() {

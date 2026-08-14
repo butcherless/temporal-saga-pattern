@@ -48,7 +48,7 @@ public class PaymentController {
     public Mono<ResponseEntity<PaymentResponseBody>> requestPayment(@RequestBody final RequestPaymentRequestBody request) {
         log.debug("requestPayment - {}", request);
 
-        return paymentProgressionService.requestPayment(new RequestPaymentRequest(request.sagaId(), request.amount(), Instant.now()))
+        return this.paymentProgressionService.requestPayment(new RequestPaymentRequest(request.sagaId(), request.amount(), Instant.now()))
                 .map(payment -> ResponseEntity.status(HttpStatus.CREATED)
                         .body(new PaymentResponseBody(payment.id(), payment.status())));
     }
@@ -62,7 +62,7 @@ public class PaymentController {
             @PathVariable("sagaId") @Parameter(description = "The saga id, also the payment's id") final UUID sagaId) {
         log.debug("refundPayment - {}", sagaId);
 
-        return paymentProgressionService.refundPayment(new RefundPaymentRequest(sagaId, Instant.now()))
+        return this.paymentProgressionService.refundPayment(new RefundPaymentRequest(sagaId, Instant.now()))
                 .map(payment -> ResponseEntity.ok(new PaymentResponseBody(payment.id(), payment.status())));
     }
 
@@ -77,7 +77,7 @@ public class PaymentController {
     public Mono<ResponseEntity<PartialRefundResponseBody>> issuePartialRefund(@RequestBody final IssuePartialRefundRequestBody request) {
         log.debug("issuePartialRefund - {}", request);
 
-        return paymentProgressionService.issuePartialRefund(new IssuePartialRefundRequest(request.sagaId(), request.amount(), Instant.now()))
+        return this.paymentProgressionService.issuePartialRefund(new IssuePartialRefundRequest(request.sagaId(), request.amount(), Instant.now()))
                 .map(refund -> ResponseEntity.status(HttpStatus.CREATED).body(new PartialRefundResponseBody(refund.id(), refund.amount())));
     }
 }

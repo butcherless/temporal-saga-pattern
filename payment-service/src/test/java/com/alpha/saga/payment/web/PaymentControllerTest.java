@@ -32,7 +32,7 @@ class PaymentControllerTest {
 
     @BeforeEach
     void setUp() {
-        client = WebTestClient.bindToController(new PaymentController(paymentProgressionService))
+        this.client = WebTestClient.bindToController(new PaymentController(this.paymentProgressionService))
                 .controllerAdvice(new RestExceptionHandler())
                 .build();
     }
@@ -41,9 +41,9 @@ class PaymentControllerTest {
     void requestPaymentReturns201WithTheCompletedPayment() {
         final UUID sagaId = UUID.randomUUID();
         final Payment payment = Payment.request(sagaId, new java.math.BigDecimal("49.99"), Instant.now()).complete(Instant.now());
-        when(paymentProgressionService.requestPayment(any())).thenReturn(Mono.just(payment));
+        when(this.paymentProgressionService.requestPayment(any())).thenReturn(Mono.just(payment));
 
-        client.post().uri("/payments")
+        this.client.post().uri("/payments")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","amount":49.99}""".formatted(sagaId))
@@ -56,7 +56,7 @@ class PaymentControllerTest {
 
     @Test
     void requestPaymentRejectsAnInvalidRequestBodyWithAProblemDetail() {
-        final ResponseSpec response = client.post().uri("/payments")
+        final ResponseSpec response = this.client.post().uri("/payments")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","amount":-1}""".formatted(UUID.randomUUID()))
@@ -68,10 +68,10 @@ class PaymentControllerTest {
     @Test
     void requestPaymentReturns422WhenTheGatewayPermanentlyDeclinesThePayment() {
         final UUID sagaId = UUID.randomUUID();
-        when(paymentProgressionService.requestPayment(any()))
+        when(this.paymentProgressionService.requestPayment(any()))
                 .thenReturn(Mono.error(new PermanentSagaException("Payment declined for amount 15000.00")));
 
-        final ResponseSpec response = client.post().uri("/payments")
+        final ResponseSpec response = this.client.post().uri("/payments")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","amount":15000.00}""".formatted(sagaId))
@@ -83,10 +83,10 @@ class PaymentControllerTest {
     @Test
     void requestPaymentReturns503WhenTheGatewayTimesOut() {
         final UUID sagaId = UUID.randomUUID();
-        when(paymentProgressionService.requestPayment(any()))
+        when(this.paymentProgressionService.requestPayment(any()))
                 .thenReturn(Mono.error(new TemporarySagaException("Payment gateway timeout for amount 2000.00")));
 
-        final ResponseSpec response = client.post().uri("/payments")
+        final ResponseSpec response = this.client.post().uri("/payments")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","amount":2000.00}""".formatted(sagaId))
@@ -101,9 +101,9 @@ class PaymentControllerTest {
         final Payment refunded = Payment.request(sagaId, new java.math.BigDecimal("49.99"), Instant.now())
                 .complete(Instant.now())
                 .refund(Instant.now());
-        when(paymentProgressionService.refundPayment(any())).thenReturn(Mono.just(refunded));
+        when(this.paymentProgressionService.refundPayment(any())).thenReturn(Mono.just(refunded));
 
-        client.post().uri("/payments/{sagaId}/refund", sagaId)
+        this.client.post().uri("/payments/{sagaId}/refund", sagaId)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
@@ -114,10 +114,10 @@ class PaymentControllerTest {
     @Test
     void refundPaymentReturns422WhenTheRefundIsPermanentlyUnrecoverable() {
         final UUID sagaId = UUID.randomUUID();
-        when(paymentProgressionService.refundPayment(any()))
+        when(this.paymentProgressionService.refundPayment(any()))
                 .thenReturn(Mono.error(new PermanentSagaException("Simulated unrecoverable refund failure for amount 750.00")));
 
-        final ResponseSpec response = client.post().uri("/payments/{sagaId}/refund", sagaId).exchange();
+        final ResponseSpec response = this.client.post().uri("/payments/{sagaId}/refund", sagaId).exchange();
 
         assertProblemDetail(response, 422, "Simulated unrecoverable refund failure for amount 750.00");
     }
@@ -126,9 +126,9 @@ class PaymentControllerTest {
     void issuePartialRefundReturns201WithTheRefund() {
         final UUID sagaId = UUID.randomUUID();
         final PartialRefund refund = new PartialRefund(sagaId, sagaId, new java.math.BigDecimal("20.00"), Instant.now(), null);
-        when(paymentProgressionService.issuePartialRefund(any())).thenReturn(Mono.just(refund));
+        when(this.paymentProgressionService.issuePartialRefund(any())).thenReturn(Mono.just(refund));
 
-        client.post().uri("/payments/partial-refunds")
+        this.client.post().uri("/payments/partial-refunds")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","amount":20.00}""".formatted(sagaId))
@@ -141,7 +141,7 @@ class PaymentControllerTest {
 
     @Test
     void issuePartialRefundRejectsAnInvalidRequestBodyWithAProblemDetail() {
-        final ResponseSpec response = client.post().uri("/payments/partial-refunds")
+        final ResponseSpec response = this.client.post().uri("/payments/partial-refunds")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {"sagaId":"%s","amount":-1}""".formatted(UUID.randomUUID()))

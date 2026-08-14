@@ -61,9 +61,9 @@ public class InventoryProgressionService {
      */
     public Mono<InventoryReservation> reserveStock(final ReserveStockRequest request) {
         log.debug("reserveStock - {}", request);
-        return inventoryReservationRepository.findById(request.sagaId())
-                .switchIfEmpty(Mono.defer(() -> debitAndReserve(request)
-                        .flatMap(reservation -> simulateReserveFault(request.sku(), reservation))));
+        return this.inventoryReservationRepository.findById(request.sagaId())
+                .switchIfEmpty(Mono.defer(() -> this.debitAndReserve(request)
+                        .flatMap(reservation -> this.simulateReserveFault(request.sku(), reservation))));
     }
 
     /**
@@ -73,10 +73,10 @@ public class InventoryProgressionService {
      */
     public Mono<InventoryReservation> confirmReservation(final ConfirmReservationRequest request) {
         log.debug("confirmReservation - {}", request);
-        return loadReservation(request.sagaId())
+        return this.loadReservation(request.sagaId())
                 .flatMap(reservation -> reservation.status() == ReservationStatus.CONFIRMED
                         ? Mono.just(reservation)
-                        : inventoryReservationRepository.save(reservation.confirm(request.now())));
+                        : this.inventoryReservationRepository.save(reservation.confirm(request.now())));
     }
 
     /**
@@ -88,11 +88,11 @@ public class InventoryProgressionService {
      */
     public Mono<InventoryReservation> releaseStock(final ReleaseStockRequest request) {
         log.debug("releaseStock - {}", request);
-        return loadReservation(request.sagaId())
+        return this.loadReservation(request.sagaId())
                 .flatMap(reservation -> reservation.status() == ReservationStatus.RELEASED
                         ? Mono.just(reservation)
-                        : simulateReleaseFault(reservation)
-                                .then(Mono.defer(() -> creditStockAndRelease(reservation, request.now()))));
+                        : this.simulateReleaseFault(reservation)
+                                .then(Mono.defer(() -> this.creditStockAndRelease(reservation, request.now()))));
     }
 
     /**
@@ -108,27 +108,27 @@ public class InventoryProgressionService {
      */
     public Mono<Void> creditStock(final CreditStockRequest request) {
         log.debug("creditStock - {}", request);
-        return loadStockItem(request.sku())
+        return this.loadStockItem(request.sku())
                 .map(stockItem -> stockItem.release(request.quantity()))
-                .flatMap(stockItemRepository::save)
+                .flatMap(this.stockItemRepository::save)
                 .then();
     }
 
     private Mono<InventoryReservation> debitAndReserve(final ReserveStockRequest request) {
-        return loadStockItem(request.sku())
+        return this.loadStockItem(request.sku())
                 .map(stockItem -> stockItem.reserve(request.quantity()))
-                .flatMap(stockItemRepository::save)
-                .then(inventoryReservationRepository.save(
+                .flatMap(this.stockItemRepository::save)
+                .then(this.inventoryReservationRepository.save(
                         InventoryReservation.reserve(request.sagaId(), request.sku(), request.quantity(), request.now())));
     }
 
     private Mono<InventoryReservation> creditStockAndRelease(final InventoryReservation reservation,
             final Instant now) {
         final InventoryReservation released = reservation.release(now);
-        return loadStockItem(reservation.sku())
+        return this.loadStockItem(reservation.sku())
                 .map(stockItem -> stockItem.release(reservation.quantity()))
-                .flatMap(stockItemRepository::save)
-                .then(inventoryReservationRepository.save(released));
+                .flatMap(this.stockItemRepository::save)
+                .then(this.inventoryReservationRepository.save(released));
     }
 
     /**
@@ -156,12 +156,12 @@ public class InventoryProgressionService {
     }
 
     private Mono<InventoryReservation> loadReservation(final UUID sagaId) {
-        return inventoryReservationRepository.findById(sagaId)
+        return this.inventoryReservationRepository.findById(sagaId)
                 .switchIfEmpty(Mono.error(() -> new IllegalStateException("Reservation not found: %s".formatted(sagaId))));
     }
 
     private Mono<StockItem> loadStockItem(final String sku) {
-        return stockItemRepository.findById(sku)
+        return this.stockItemRepository.findById(sku)
                 .switchIfEmpty(Mono.error(() -> new IllegalStateException("Stock item not found: %s".formatted(sku))));
     }
 }

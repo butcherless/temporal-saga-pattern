@@ -1,5 +1,6 @@
 package com.alpha.saga.order.web;
 
+import com.alpha.saga.common.util.StringUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -24,7 +25,7 @@ public record CreateOrderRequestBody(
         Objects.requireNonNull(sku, "sku must not be null");
         Objects.requireNonNull(quantity, "quantity must not be null");
         Objects.requireNonNull(amount, "amount must not be null");
-        if (sku.isBlank()) {
+        if (StringUtils.isBlank(sku)) {
             throw new IllegalArgumentException("sku must not be blank");
         }
         if (quantity <= 0) {
@@ -36,6 +37,6 @@ public record CreateOrderRequestBody(
     }
 
     public Boolean hasNoBusinessKey() {
-        return this.businessKey == null || this.businessKey.isBlank();
+        return StringUtils.isBlank(this.businessKey);
     }
 }

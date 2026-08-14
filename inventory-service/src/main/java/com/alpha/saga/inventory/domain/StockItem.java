@@ -1,6 +1,7 @@
 package com.alpha.saga.inventory.domain;
 
 import com.alpha.saga.common.error.PermanentSagaException;
+import com.alpha.saga.common.util.StringUtils;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.relational.core.mapping.Table;
@@ -20,7 +21,7 @@ public record StockItem(@Id String sku,
 
     public StockItem {
         Objects.requireNonNull(sku, "sku must not be null");
-        if (sku.isBlank()) {
+        if (StringUtils.isBlank(sku)) {
             throw new IllegalArgumentException("sku must not be blank");
         }
         if (availableQuantity < 0) {

@@ -1,5 +1,6 @@
 package com.alpha.saga.inventory.web;
 
+import com.alpha.saga.common.util.StringUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.Objects;
@@ -18,7 +19,7 @@ public record ReserveStockRequestBody(
         Objects.requireNonNull(sagaId, "sagaId must not be null");
         Objects.requireNonNull(sku, "sku must not be null");
         Objects.requireNonNull(quantity, "quantity must not be null");
-        if (sku.isBlank()) {
+        if (StringUtils.isBlank(sku)) {
             throw new IllegalArgumentException("sku must not be blank");
         }
         if (quantity <= 0) {

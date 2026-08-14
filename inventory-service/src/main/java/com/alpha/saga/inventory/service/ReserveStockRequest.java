@@ -1,5 +1,7 @@
 package com.alpha.saga.inventory.service;
 
+import com.alpha.saga.common.util.StringUtils;
+
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -15,7 +17,7 @@ public record ReserveStockRequest(UUID sagaId,
         Objects.requireNonNull(sku, "sku must not be null");
         Objects.requireNonNull(quantity, "quantity must not be null");
         Objects.requireNonNull(now, "now must not be null");
-        if (sku.isBlank()) {
+        if (StringUtils.isBlank(sku)) {
             throw new IllegalArgumentException("sku must not be blank");
         }
         if (quantity <= 0) {

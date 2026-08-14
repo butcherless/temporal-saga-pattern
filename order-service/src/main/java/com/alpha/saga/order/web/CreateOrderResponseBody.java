@@ -1,5 +1,6 @@
 package com.alpha.saga.order.web;
 
+import com.alpha.saga.common.util.StringUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.Objects;
@@ -15,7 +16,7 @@ public record CreateOrderResponseBody(
     public CreateOrderResponseBody {
         Objects.requireNonNull(sagaId, "sagaId must not be null");
         Objects.requireNonNull(businessKey, "businessKey must not be null");
-        if (businessKey.isBlank()) {
+        if (StringUtils.isBlank(businessKey)) {
             throw new IllegalArgumentException("businessKey must not be blank");
         }
     }

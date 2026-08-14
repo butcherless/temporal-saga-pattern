@@ -1,5 +1,6 @@
 package com.alpha.saga.order.domain;
 
+import com.alpha.saga.common.util.StringUtils;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.relational.core.mapping.Table;
@@ -31,7 +32,7 @@ public record CustomerOrder(
         Objects.requireNonNull(status, "status must not be null");
         Objects.requireNonNull(createdAt, "createdAt must not be null");
         Objects.requireNonNull(updatedAt, "updatedAt must not be null");
-        if (businessKey.isBlank()) {
+        if (StringUtils.isBlank(businessKey)) {
             throw new IllegalArgumentException("businessKey must not be blank");
         }
     }

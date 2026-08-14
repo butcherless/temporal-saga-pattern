@@ -16,6 +16,8 @@ Beyond those reference scenarios, `order-service` also exposes `GET /orders/{sag
 
 Same conventions as `saga-pattern-poc` (English-only source/docs except the proposal doc above, TDD, Lombok-only logging, reactive stack wherever a reactive Spring starter exists, `final` method arguments via OpenRewrite, no primitive types in public signatures, OpenAPI 3.1 code-first REST endpoints, append-only Flyway migrations) — see that repo's own `CLAUDE.md` for the full rationale behind each. They're not repeated here.
 
+**String null-or-blank checks:** never inline `x == null || x.isBlank()` (or an unguarded `x.isBlank()`, which NPEs on a null `x`) — call `com.alpha.saga.common.util.StringUtils.isBlank(String)` (`saga-common`) instead. One null-safe implementation shared by every module, rather than the same chain rewritten at each call site.
+
 ## Architecture
 
 ### What Temporal replaces

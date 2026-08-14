@@ -77,7 +77,7 @@ public class OrderCreationHandler {
         // WorkflowClient.start is a blocking gRPC call; run it off the WebFlux event loop.
         return Mono.fromRunnable(() -> WorkflowClient.start(workflow::process, input))
                 .subscribeOn(blockingCallScheduler)
-                .onErrorResume(WorkflowExecutionAlreadyStarted.class, error -> Mono.empty())
+                .onErrorResume(WorkflowExecutionAlreadyStarted.class, _ -> Mono.empty())
                 .then();
     }
 }

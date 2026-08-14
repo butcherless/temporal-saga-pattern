@@ -337,7 +337,7 @@ class TemporalEndToEndSagaIT {
                 if (response.statusCode() == 200 && response.body().contains("\"UP\"")) {
                     return;
                 }
-            } catch (final IOException error) {
+            } catch (final IOException _) {
                 // Not up yet — keep polling until the deadline.
             }
             Thread.sleep(POLL_INTERVAL.toMillis());

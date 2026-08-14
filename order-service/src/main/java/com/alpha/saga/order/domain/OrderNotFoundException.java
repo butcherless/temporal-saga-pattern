@@ -14,8 +14,9 @@ public final class OrderNotFoundException extends RuntimeException {
     private final UUID sagaId;
 
     public OrderNotFoundException(final UUID sagaId) {
+        Objects.requireNonNull(sagaId, "sagaId must not be null");
         super("Order not found: %s".formatted(sagaId));
-        this.sagaId = Objects.requireNonNull(sagaId, "sagaId must not be null");
+        this.sagaId = sagaId;
     }
 
     public UUID sagaId() {

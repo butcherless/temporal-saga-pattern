@@ -15,9 +15,11 @@ public final class IllegalPaymentTransitionException extends IllegalStateExcepti
 
     public IllegalPaymentTransitionException(final PaymentStatus from,
             final PaymentStatus to) {
+        Objects.requireNonNull(from, "from must not be null");
+        Objects.requireNonNull(to, "to must not be null");
         super("Illegal payment transition from %s to %s".formatted(from, to));
-        this.from = Objects.requireNonNull(from, "from must not be null");
-        this.to = Objects.requireNonNull(to, "to must not be null");
+        this.from = from;
+        this.to = to;
     }
 
     public PaymentStatus from() {

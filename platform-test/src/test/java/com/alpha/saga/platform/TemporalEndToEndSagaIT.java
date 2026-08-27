@@ -86,7 +86,7 @@ class TemporalEndToEndSagaIT {
     private static final int TEMPORAL_GRPC_PORT = 7233;
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:18.4-alpine")
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:18.6-alpine")
             .withEnv("POSTGRES_MULTIPLE_DATABASES", "order_db,inventory_db,payment_db")
             .withCopyFileToContainer(
                     MountableFile.forClasspathResource("init-multiple-databases.sh"),

@@ -1,9 +1,8 @@
 package com.alpha.saga.order.domain;
 
-import java.util.Collections;
-import java.util.EnumMap;
+import com.alpha.saga.common.state.StateTransitions;
+
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -19,31 +18,23 @@ public enum OrderStatus {
     CONFIRMED,
     CANCELLED;
 
-    private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED_TRANSITIONS = buildTransitionGraph();
+    private static final StateTransitions<OrderStatus> TRANSITIONS = StateTransitions.of(Map.of(
+            PENDING, Set.of(CONFIRMED, CANCELLED),
+            CONFIRMED, Set.of(),
+            CANCELLED, Set.of()));
 
     /** Whether this state may legally transition directly to {@code target}. */
     public boolean canTransitionTo(final OrderStatus target) {
-        Objects.requireNonNull(target, "target must not be null");
-        return ALLOWED_TRANSITIONS.get(this).contains(target);
+        return TRANSITIONS.allows(this, target);
     }
 
     /** The set of states this state may legally transition to; empty for terminal states. */
     public Set<OrderStatus> allowedNextStates() {
-        return ALLOWED_TRANSITIONS.get(this);
+        return TRANSITIONS.nextStates(this);
     }
 
     /** Whether no further transition is possible from this state. */
     public boolean isTerminal() {
-        return this.allowedNextStates().isEmpty();
-    }
-
-    private static Map<OrderStatus, Set<OrderStatus>> buildTransitionGraph() {
-        final Map<OrderStatus, Set<OrderStatus>> graph = new EnumMap<>(OrderStatus.class);
-
-        graph.put(PENDING, Set.of(CONFIRMED, CANCELLED));
-        graph.put(CONFIRMED, Set.of());
-        graph.put(CANCELLED, Set.of());
-
-        return Collections.unmodifiableMap(graph);
+        return TRANSITIONS.isTerminal(this);
     }
 }

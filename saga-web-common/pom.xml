@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.alpha.saga</groupId>
+        <artifactId>distributed-saga-platform-temporal</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>saga-web-common</artifactId>
+    <packaging>jar</packaging>
+
+    <name>saga-web-common</name>
+    <description>Shared WebFlux plumbing for the business services: the RFC 9457 error-mapping base advice</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.alpha.saga</groupId>
+            <artifactId>saga-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- provided: every consuming service already brings spring-boot-starter-webflux itself;
+             this module only needs it to compile against ResponseEntityExceptionHandler. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

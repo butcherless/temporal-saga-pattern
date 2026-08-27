@@ -158,9 +158,9 @@ wait_order_status() {
     done
 }
 
-# Recreates Postgres+Temporal from scratch, rebuilds the five module jars (saga-common plus the
-# four services), starts the three business services then the Temporal Worker last, and waits for
-# all four to report healthy. Identical across every scenario script.
+# Recreates Postgres+Temporal from scratch, rebuilds the module jars (saga-common + saga-web-common
+# pulled in via -am, plus the four services), starts the three business services then the Temporal
+# Worker last, and waits for all four to report healthy. Identical across every scenario script.
 bootstrap_environment() {
     mkdir -p "$LOG_DIR"
 

@@ -1,5 +1,6 @@
 package com.alpha.saga.order.web;
 
+import com.alpha.saga.common.util.StringUtils;
 import com.alpha.saga.common.workflow.OrderSagaInput;
 import com.alpha.saga.common.workflow.OrderSagaWorkflow;
 import com.alpha.saga.common.workflow.SagaTaskQueues;
@@ -43,7 +44,7 @@ public class OrderCreationHandler {
     public Mono<CreateOrderResponseBody> createOrder(final CreateOrderRequestBody request) {
         log.debug("createOrder - {}", request);
         final UUID sagaId = UUID.randomUUID();
-        final String businessKey = request.hasNoBusinessKey() ? sagaId.toString() : request.businessKey();
+        final String businessKey = StringUtils.isBlank(request.businessKey()) ? sagaId.toString() : request.businessKey();
         final Instant now = Instant.now();
 
         return this.orderProgressionService.createOrder(new CreateOrderRequest(sagaId, businessKey, now))

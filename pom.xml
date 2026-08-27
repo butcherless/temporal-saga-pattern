@@ -14,6 +14,7 @@
 
     <modules>
         <module>saga-common</module>
+        <module>saga-web-common</module>
         <module>saga-orchestrator-temporal</module>
         <module>order-service</module>
         <module>inventory-service</module>

@@ -1,9 +1,8 @@
 package com.alpha.saga.inventory.domain;
 
-import java.util.Collections;
-import java.util.EnumMap;
+import com.alpha.saga.common.state.StateTransitions;
+
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -19,31 +18,23 @@ public enum ReservationStatus {
     CONFIRMED,
     RELEASED;
 
-    private static final Map<ReservationStatus, Set<ReservationStatus>> ALLOWED_TRANSITIONS = buildTransitionGraph();
+    private static final StateTransitions<ReservationStatus> TRANSITIONS = StateTransitions.of(Map.of(
+            RESERVED, Set.of(CONFIRMED, RELEASED),
+            CONFIRMED, Set.of(),
+            RELEASED, Set.of()));
 
     /** Whether this state may legally transition directly to {@code target}. */
     public boolean canTransitionTo(final ReservationStatus target) {
-        Objects.requireNonNull(target, "target must not be null");
-        return ALLOWED_TRANSITIONS.get(this).contains(target);
+        return TRANSITIONS.allows(this, target);
     }
 
     /** The set of states this state may legally transition to; empty for terminal states. */
     public Set<ReservationStatus> allowedNextStates() {
-        return ALLOWED_TRANSITIONS.get(this);
+        return TRANSITIONS.nextStates(this);
     }
 
     /** Whether no further transition is possible from this state. */
     public boolean isTerminal() {
-        return this.allowedNextStates().isEmpty();
-    }
-
-    private static Map<ReservationStatus, Set<ReservationStatus>> buildTransitionGraph() {
-        final Map<ReservationStatus, Set<ReservationStatus>> graph = new EnumMap<>(ReservationStatus.class);
-
-        graph.put(RESERVED, Set.of(CONFIRMED, RELEASED));
-        graph.put(CONFIRMED, Set.of());
-        graph.put(RELEASED, Set.of());
-
-        return Collections.unmodifiableMap(graph);
+        return TRANSITIONS.isTerminal(this);
     }
 }

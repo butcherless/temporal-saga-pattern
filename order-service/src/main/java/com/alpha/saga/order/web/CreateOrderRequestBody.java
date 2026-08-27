@@ -35,8 +35,4 @@ public record CreateOrderRequestBody(
             throw new IllegalArgumentException("amount must be positive");
         }
     }
-
-    public Boolean hasNoBusinessKey() {
-        return StringUtils.isBlank(this.businessKey);
-    }
 }

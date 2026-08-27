@@ -1,9 +1,8 @@
 package com.alpha.saga.payment.domain;
 
-import java.util.Collections;
-import java.util.EnumMap;
+import com.alpha.saga.common.state.StateTransitions;
+
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -20,32 +19,24 @@ public enum PaymentStatus {
     FAILED,
     REFUNDED;
 
-    private static final Map<PaymentStatus, Set<PaymentStatus>> ALLOWED_TRANSITIONS = buildTransitionGraph();
+    private static final StateTransitions<PaymentStatus> TRANSITIONS = StateTransitions.of(Map.of(
+            PENDING, Set.of(COMPLETED, FAILED),
+            COMPLETED, Set.of(REFUNDED),
+            FAILED, Set.of(),
+            REFUNDED, Set.of()));
 
     /** Whether this state may legally transition directly to {@code target}. */
     public boolean canTransitionTo(final PaymentStatus target) {
-        Objects.requireNonNull(target, "target must not be null");
-        return ALLOWED_TRANSITIONS.get(this).contains(target);
+        return TRANSITIONS.allows(this, target);
     }
 
     /** The set of states this state may legally transition to; empty for terminal states. */
     public Set<PaymentStatus> allowedNextStates() {
-        return ALLOWED_TRANSITIONS.get(this);
+        return TRANSITIONS.nextStates(this);
     }
 
     /** Whether no further transition is possible from this state. */
     public boolean isTerminal() {
-        return this.allowedNextStates().isEmpty();
-    }
-
-    private static Map<PaymentStatus, Set<PaymentStatus>> buildTransitionGraph() {
-        final Map<PaymentStatus, Set<PaymentStatus>> graph = new EnumMap<>(PaymentStatus.class);
-
-        graph.put(PENDING, Set.of(COMPLETED, FAILED));
-        graph.put(COMPLETED, Set.of(REFUNDED));
-        graph.put(FAILED, Set.of());
-        graph.put(REFUNDED, Set.of());
-
-        return Collections.unmodifiableMap(graph);
+        return TRANSITIONS.isTerminal(this);
     }
 }

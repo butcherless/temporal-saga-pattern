@@ -26,7 +26,8 @@ There is no `saga-orchestrator` module, no `SagaStatus` state machine, no `saga_
 
 ### Module layout
 
-- `saga-common` — shared, Spring-free: `error/` (the `SagaException`/`TemporarySagaException`/`PermanentSagaException` classification, carried over unchanged from `saga-pattern-poc`; each business service's `RestExceptionHandler` maps them to 503/422, which the orchestrator's Activities turn into a retryable vs. non-retryable `ApplicationFailure`) and `workflow/` (the `OrderSagaWorkflow` contract + `OrderSagaInput` + `SagaTaskQueues` — the Temporal analogue of the old `Command`/`Event`/`MessageHeader` envelope, shared between whoever starts the saga and whoever executes it).
+- `saga-common` — shared, Spring-free: `error/` (the `SagaException`/`TemporarySagaException`/`PermanentSagaException` classification, carried over unchanged from `saga-pattern-poc`; each business service's `RestExceptionHandler` maps them to 503/422, which the orchestrator's Activities turn into a retryable vs. non-retryable `ApplicationFailure` — plus `AbstractIllegalStatusTransitionException`, the shared parent of the three services' `Illegal*TransitionException`), `state/` (`StateTransitions<S>` — the shared legal-transition-graph helper each service's status enum holds one of, instead of re-implementing the `canTransitionTo`/`allowedNextStates`/`isTerminal` boilerplate), and `workflow/` (the `OrderSagaWorkflow` contract + `OrderSagaInput` + `SagaTaskQueues` — the Temporal analogue of the old `Command`/`Event`/`MessageHeader` envelope, shared between whoever starts the saga and whoever executes it).
+- `saga-web-common` — shared WebFlux plumbing (a separate module because `saga-common` is kept Spring-free): `AbstractSagaRestExceptionHandler`, the RFC 9457 `ProblemDetail` error-mapping base that each service's `RestExceptionHandler` extends (adding only `@RestControllerAdvice` plus its own extra handlers, e.g. `order-service`'s `OrderNotFoundException` → 404). Depends on `spring-boot-starter-webflux` at `provided` scope.
 - `order-service`, `inventory-service`, `payment-service` — same `domain`/`persistence`/`service` packages as `saga-pattern-poc` (business rules and their idempotency-by-`sagaId`/`businessKey` are unchanged), no `messaging` package at all. `order-service`'s `web` package now starts the Workflow (`WorkflowClient.start(...)`) instead of writing to an outbox, and also queries it (`OrderQueryHandler`, backing `GET /orders/{sagaId}`); `inventory-service` and `payment-service` each got a brand-new `web` package (they had none before — the custom implementation only ever consumed/produced Kafka) exposing the REST endpoints the orchestrator's Activities call.
 - `saga-orchestrator-temporal` — the Temporal Worker: `workflow/OrderSagaWorkflowImpl` (the saga itself) + `activities/` (three `@ActivityInterface`s, one per business service, each implemented as a `WebClient` call) + `config/ActivityWebClientConfig` (one `WebClient` bean per service, disambiguated by bean name/`@Qualifier` — same pattern `saga-pattern-poc` uses for its nested-transaction beans). Owns no database.
 - `platform-test` — `TemporalEndToEndSagaIT`: forks all four services as real `java -jar` processes (same reason as `saga-pattern-poc`'s `EndToEndSagaIT` — identically-named classpath resources across service jars rule out an in-process shared-classloader test) against a Testcontainers Postgres (only `order_db`/`inventory_db`/`payment_db` — no `saga_orchestrator_db`) and a Testcontainers `temporalio/temporal:1.8.2` dev server (`server start-dev`, in-memory, no schema of its own — lighter than `docker-compose.yml`'s production-style setup, appropriate for a test that tears everything down afterward).
@@ -95,7 +96,7 @@ Same pattern and port table as `saga-pattern-poc` (`saga-orchestrator-temporal` 
 | `payment-service` | 8083 |
 
 ```bash
-./mvnw install -pl saga-common -DskipTests -q
+./mvnw install -pl saga-common,saga-web-common -DskipTests -q
 ./mvnw spring-boot:run -pl <module>
 ```
 
@@ -111,7 +112,7 @@ Scripted equivalent: `platform-test/scripts/start-all.sh` (steps 1-5 below, then
    docker run --rm --network temporal-saga-pattern_default temporalio/admin-tools:1.31.2 \
      temporal operator namespace create --address saga-temporal:7233 default
    ```
-3. `./mvnw install -pl saga-common -DskipTests -q` — every other module depends on it.
+3. `./mvnw install -pl saga-common,saga-web-common -DskipTests -q` — every other module depends on them.
 4. Start the three business services, one terminal each, in any relative order among themselves (`DB_*` env vars per `saga-pattern-poc`; `order-service` additionally needs `TEMPORAL_TARGET`):
    ```bash
    ./mvnw spring-boot:run -pl order-service

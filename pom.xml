@@ -29,7 +29,7 @@
 
         <maven.min.version>3.9.0</maven.min.version>
 
-        <spring-boot.version>4.1.0</spring-boot.version>
+        <spring-boot.version>4.1.1</spring-boot.version>
         <!-- 1.34.0+ added Spring Boot 4 support; not managed by the Spring Boot BOM. Floor is
              1.38.0 specifically for https://github.com/temporalio/sdk-java/pull/2957 — below that,
              WorkerOptions#isUsingVirtualThreadsOnWorkflowWorker() returns the Activity worker's
@@ -60,18 +60,24 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- temporal-sdk's own transitive graph reaches these two utility libraries at
-                 several different versions across its own paths (gson -> error_prone_annotations
-                 2.41.0, guava -> 2.36.0, grpc-api/-stub/-netty-shaded/-services/-core -> 2.45.0,
-                 protobuf-java-util -> 2.18.0; guava itself at 33.4.8-android directly and
-                 33.5.0-android/33.5.0-jre transitively) — an internal inconsistency in that SDK's
-                 own POM tree, not something the Spring Boot BOM's own pinning causes (confirmed
-                 via `mvn dependency:tree -Dverbose`). Pinned here to the highest version seen so
-                 both dependencyConvergence and requireUpperBoundDeps resolve deterministically. -->
+            <!-- temporal-sdk's own transitive graph reaches these utility libraries at several
+                 different versions across its own paths — and the Spring Boot BOM's grpc 1.83.1 /
+                 protobuf 4.35.1 pins widen the spread further (grpc-* -> error_prone_annotations
+                 2.50.0 and gson 2.14.0; protobuf-java-util -> error_prone 2.18.0 / gson 2.8.9;
+                 temporal-sdk -> gson 2.10.1; guava at 33.4.8-android directly, 33.5.0-android
+                 transitively). An internal inconsistency in those graphs, not something the Spring
+                 Boot BOM's own pinning causes (confirmed via `mvn dependency:tree -Dverbose`).
+                 Pinned here to the highest version seen so both dependencyConvergence and
+                 requireUpperBoundDeps resolve deterministically. -->
             <dependency>
                 <groupId>com.google.errorprone</groupId>
                 <artifactId>error_prone_annotations</artifactId>
-                <version>2.45.0</version>
+                <version>2.50.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.code.gson</groupId>
+                <artifactId>gson</artifactId>
+                <version>2.14.0</version>
             </dependency>
             <dependency>
                 <groupId>com.google.guava</groupId>
@@ -172,7 +178,7 @@
                                         <exclude>io.prometheus:prometheus-metrics-core</exclude>
                                         <exclude>io.prometheus:prometheus-metrics-exposition-formats</exclude>
                                         <exclude>io.prometheus:prometheus-metrics-tracer-common</exclude>
-                                        <!-- Same pattern: the Spring Boot 4.1.0 BOM pins these two legacy
+                                        <!-- Same pattern: the Spring Boot 4.1.1 BOM pins these two legacy
                                              Jackson 2.x artifacts (used internally by swagger-core-jakarta,
                                              pulled in transitively by springdoc-openapi-starter-webflux-ui)
                                              below what swagger-core-jakarta itself was built against. -->

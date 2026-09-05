@@ -43,10 +43,7 @@ class OrderActivitiesImplTest {
                 this.exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT,
                 "Simulated unrecoverable order confirmation failure for businessKey ORDER-2026-CONFIRMFAIL-INPUTDATA-7");
 
-        assertThatThrownBy(() -> this.activities.confirmOrder(UUID.randomUUID()))
-                .isInstanceOf(ApplicationFailure.class)
-                .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
-                .isEqualTo(true);
+        ExchangeFunctionStub.assertNonRetryable(() -> this.activities.confirmOrder(UUID.randomUUID()));
     }
 
     /**

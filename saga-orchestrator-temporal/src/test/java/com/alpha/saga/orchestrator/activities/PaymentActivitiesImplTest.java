@@ -42,10 +42,7 @@ class PaymentActivitiesImplTest {
     void requestPaymentThrowsANonRetryableFailureWhenTheGatewayPermanentlyDeclinesThePayment() {
         ExchangeFunctionStub.stubResponse(this.exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Payment declined for amount 15000.00");
 
-        assertThatThrownBy(() -> this.activities.requestPayment(UUID.randomUUID(), new BigDecimal("15000.00")))
-                .isInstanceOf(ApplicationFailure.class)
-                .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
-                .isEqualTo(true);
+        ExchangeFunctionStub.assertNonRetryable(() -> this.activities.requestPayment(UUID.randomUUID(), new BigDecimal("15000.00")));
     }
 
     /**
@@ -78,9 +75,6 @@ class PaymentActivitiesImplTest {
         ExchangeFunctionStub.stubResponse(
                 this.exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Simulated unrecoverable refund failure for amount 750.00");
 
-        assertThatThrownBy(() -> this.activities.refundPayment(UUID.randomUUID()))
-                .isInstanceOf(ApplicationFailure.class)
-                .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
-                .isEqualTo(true);
+        ExchangeFunctionStub.assertNonRetryable(() -> this.activities.refundPayment(UUID.randomUUID()));
     }
 }

@@ -1,5 +1,7 @@
 package com.alpha.saga.orchestrator.activities;
 
+import io.temporal.failure.ApplicationFailure;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -10,6 +12,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -51,5 +54,16 @@ final class ExchangeFunctionStub {
         verify(exchangeFunction).exchange(requestCaptor.capture());
         assertThat(requestCaptor.getValue().method()).isEqualTo(HttpMethod.POST);
         assertThat(requestCaptor.getValue().url().getPath()).isEqualTo(expectedPath);
+    }
+
+    /**
+     * Asserts that invoking {@code call} throws a non-retryable {@link ApplicationFailure} —
+     * the permanent-failure half of each Activity's {@code toActivityFailure} classification.
+     */
+    static void assertNonRetryable(final ThrowingCallable call) {
+        assertThatThrownBy(call)
+                .isInstanceOf(ApplicationFailure.class)
+                .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
+                .isEqualTo(true);
     }
 }

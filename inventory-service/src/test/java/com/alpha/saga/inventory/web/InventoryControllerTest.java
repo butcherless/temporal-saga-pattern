@@ -25,6 +25,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class InventoryControllerTest {
 
+    private static final String SKU = "SKU-001";
+
     @Mock
     private InventoryProgressionService inventoryProgressionService;
 
@@ -40,13 +42,13 @@ class InventoryControllerTest {
     @Test
     void reserveStockReturns201WithTheReservation() {
         final UUID sagaId = UUID.randomUUID();
-        final InventoryReservation reservation = InventoryReservation.reserve(sagaId, "SKU-001", 5, Instant.now());
+        final InventoryReservation reservation = InventoryReservation.reserve(sagaId, SKU, 5, Instant.now());
         when(this.inventoryProgressionService.reserveStock(any())).thenReturn(Mono.just(reservation));
 
         this.client.post().uri("/inventory/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
-                        {"sagaId":"%s","sku":"SKU-001","quantity":5}""".formatted(sagaId))
+                        {"sagaId":"%s","sku":"%s","quantity":5}""".formatted(sagaId, SKU))
                 .exchange()
                 .expectStatus().isCreated()
                 .expectBody()
@@ -59,7 +61,7 @@ class InventoryControllerTest {
         final ResponseSpec response = this.client.post().uri("/inventory/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
-                        {"sagaId":"%s","sku":"SKU-001","quantity":-1}""".formatted(UUID.randomUUID()))
+                        {"sagaId":"%s","sku":"%s","quantity":-1}""".formatted(UUID.randomUUID(), SKU))
                 .exchange();
 
         assertProblemDetail(response, 400, "quantity must be positive");
@@ -69,15 +71,15 @@ class InventoryControllerTest {
     void reserveStockReturns422WhenStockIsPermanentlyInsufficient() {
         final UUID sagaId = UUID.randomUUID();
         when(this.inventoryProgressionService.reserveStock(any()))
-                .thenReturn(Mono.error(new PermanentSagaException("Insufficient stock for SKU-001: requested 999, available 100")));
+                .thenReturn(Mono.error(new PermanentSagaException("Insufficient stock for %s: requested 999, available 100".formatted(SKU))));
 
         final ResponseSpec response = this.client.post().uri("/inventory/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
-                        {"sagaId":"%s","sku":"SKU-001","quantity":999}""".formatted(sagaId))
+                        {"sagaId":"%s","sku":"%s","quantity":999}""".formatted(sagaId, SKU))
                 .exchange();
 
-        assertProblemDetail(response, 422, "Insufficient stock for SKU-001: requested 999, available 100");
+        assertProblemDetail(response, 422, "Insufficient stock for %s: requested 999, available 100".formatted(SKU));
     }
 
     @Test
@@ -98,7 +100,7 @@ class InventoryControllerTest {
     @Test
     void confirmReservationReturns200WithTheConfirmedStatus() {
         final UUID sagaId = UUID.randomUUID();
-        final InventoryReservation confirmed = InventoryReservation.reserve(sagaId, "SKU-001", 5, Instant.now()).confirm(Instant.now());
+        final InventoryReservation confirmed = InventoryReservation.reserve(sagaId, SKU, 5, Instant.now()).confirm(Instant.now());
         when(this.inventoryProgressionService.confirmReservation(any())).thenReturn(Mono.just(confirmed));
 
         this.client.post().uri("/inventory/reservations/{sagaId}/confirm", sagaId)
@@ -129,7 +131,7 @@ class InventoryControllerTest {
     @Test
     void releaseStockReturns200WithTheReleasedStatus() {
         final UUID sagaId = UUID.randomUUID();
-        final InventoryReservation released = InventoryReservation.reserve(sagaId, "SKU-001", 5, Instant.now()).release(Instant.now());
+        final InventoryReservation released = InventoryReservation.reserve(sagaId, SKU, 5, Instant.now()).release(Instant.now());
         when(this.inventoryProgressionService.releaseStock(any())).thenReturn(Mono.just(released));
 
         this.client.post().uri("/inventory/reservations/{sagaId}/release", sagaId)
@@ -159,7 +161,7 @@ class InventoryControllerTest {
         this.client.post().uri("/inventory/reservations/credit")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
-                        {"sagaId":"%s","sku":"SKU-001","quantity":10}""".formatted(sagaId))
+                        {"sagaId":"%s","sku":"%s","quantity":10}""".formatted(sagaId, SKU))
                 .exchange()
                 .expectStatus().isOk();
     }
@@ -169,7 +171,7 @@ class InventoryControllerTest {
         final ResponseSpec response = this.client.post().uri("/inventory/reservations/credit")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
-                        {"sagaId":"%s","sku":"SKU-001","quantity":-1}""".formatted(UUID.randomUUID()))
+                        {"sagaId":"%s","sku":"%s","quantity":-1}""".formatted(UUID.randomUUID(), SKU))
                 .exchange();
 
         assertProblemDetail(response, 400, "quantity must be positive");

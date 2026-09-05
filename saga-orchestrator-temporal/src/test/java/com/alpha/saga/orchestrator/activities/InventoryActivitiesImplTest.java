@@ -42,10 +42,7 @@ class InventoryActivitiesImplTest {
         ExchangeFunctionStub.stubResponse(
                 this.exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Insufficient stock for SKU-001: requested 999, available 100");
 
-        assertThatThrownBy(() -> this.activities.reserveStock(UUID.randomUUID(), "SKU-001", 999))
-                .isInstanceOf(ApplicationFailure.class)
-                .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
-                .isEqualTo(true);
+        ExchangeFunctionStub.assertNonRetryable(() -> this.activities.reserveStock(UUID.randomUUID(), "SKU-001", 999));
     }
 
     /**
@@ -89,9 +86,6 @@ class InventoryActivitiesImplTest {
         ExchangeFunctionStub.stubResponse(
                 this.exchangeFunction, HttpStatus.UNPROCESSABLE_CONTENT, "Simulated unrecoverable release failure for sku SKU-INPUTDATA-6");
 
-        assertThatThrownBy(() -> this.activities.releaseStock(UUID.randomUUID()))
-                .isInstanceOf(ApplicationFailure.class)
-                .extracting(failure -> ((ApplicationFailure) failure).isNonRetryable())
-                .isEqualTo(true);
+        ExchangeFunctionStub.assertNonRetryable(() -> this.activities.releaseStock(UUID.randomUUID()));
     }
 }

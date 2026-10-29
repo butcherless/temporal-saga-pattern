@@ -29,25 +29,27 @@
 
         <maven.min.version>3.9.0</maven.min.version>
 
-        <spring-boot.version>4.1.1</spring-boot.version>
+        <spring-boot.version>4.1.2</spring-boot.version>
         <!-- 1.34.0+ added Spring Boot 4 support; not managed by the Spring Boot BOM. Floor is
              1.38.0 specifically for https://github.com/temporalio/sdk-java/pull/2957 — below that,
              WorkerOptions#isUsingVirtualThreadsOnWorkflowWorker() returns the Activity worker's
              flag instead of its own, which VirtualThreadWorkerOptionsCustomizer relies on being
              correct to keep virtual threads scoped to the Activity worker only. -->
-        <temporal.version>1.38.0</temporal.version>
+        <temporal.version>1.40.0</temporal.version>
         <resilience4j.version>2.4.0</resilience4j.version>
+        <!-- Not managed by the Spring Boot BOM. -->
+        <springdoc.version>3.2.0</springdoc.version>
         <!-- Matches the version the Spring Boot BOM manages; pinned explicitly because
              annotationProcessorPaths entries below don't inherit from dependencyManagement. -->
-        <lombok.version>1.18.46</lombok.version>
+        <lombok.version>1.18.48</lombok.version>
 
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
-        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+        <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
         <!-- Not managed by the Spring Boot BOM; only modules with Testcontainers-based
              integration tests (*IT.java) bind this plugin explicitly. -->
-        <maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
+        <maven-failsafe-plugin.version>3.6.1</maven-failsafe-plugin.version>
         <!-- 0.8.15 is the first release with official (not experimental) Java 25 class-file support. -->
-        <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
+        <jacoco-maven-plugin.version>0.8.16</jacoco-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -178,7 +180,7 @@
                                         <exclude>io.prometheus:prometheus-metrics-core</exclude>
                                         <exclude>io.prometheus:prometheus-metrics-exposition-formats</exclude>
                                         <exclude>io.prometheus:prometheus-metrics-tracer-common</exclude>
-                                        <!-- Same pattern: the Spring Boot 4.1.1 BOM pins these two legacy
+                                        <!-- Same pattern: the Spring Boot 4.1.2 BOM pins these two legacy
                                              Jackson 2.x artifacts (used internally by swagger-core-jakarta,
                                              pulled in transitively by springdoc-openapi-starter-webflux-ui)
                                              below what swagger-core-jakarta itself was built against. -->

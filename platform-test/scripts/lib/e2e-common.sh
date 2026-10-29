@@ -21,7 +21,7 @@ readonly LOG_DIR="$REPO_ROOT/platform-test/target/e2e-logs/$SCENARIO_NAME"
 readonly POSTGRES_CONTAINER="saga-temporal-postgres"
 readonly TEMPORAL_CONTAINER="saga-temporal"
 readonly TEMPORAL_NETWORK="temporal-saga-pattern_default"
-readonly TEMPORAL_ADMIN_IMAGE="temporalio/admin-tools:1.31.2"
+readonly TEMPORAL_ADMIN_IMAGE="temporalio/admin-tools:1.32.1"
 
 # Parallel arrays (not an associative array: the default /bin/bash on macOS is 3.2, which
 # predates `declare -A`) — SERVICE_PORTS[i] is the port for SERVICES[i].

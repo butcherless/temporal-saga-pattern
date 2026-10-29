@@ -93,7 +93,7 @@ class TemporalEndToEndSagaIT {
                     "/docker-entrypoint-initdb.d/init-multiple-databases.sh");
 
     @Container
-    static final GenericContainer<?> TEMPORAL = new GenericContainer<>("temporalio/temporal:1.8.2")
+    static final GenericContainer<?> TEMPORAL = new GenericContainer<>("temporalio/temporal:1.9.1")
             .withCommand("server", "start-dev", "--ip", "0.0.0.0")
             .withExposedPorts(TEMPORAL_GRPC_PORT);
 

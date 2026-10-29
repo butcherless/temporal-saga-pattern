@@ -33,7 +33,7 @@ services:
   # (compose/docker-compose-postgres.yml) — temporalio/auto-setup, the older all-in-one image, is
   # deprecated.
   temporal-schema-setup:
-    image: temporalio/admin-tools:1.31.2
+    image: temporalio/admin-tools:1.32.1
     container_name: saga-temporal-schema-setup
     depends_on:
       postgres:
@@ -51,7 +51,7 @@ services:
     command: /scripts/setup-postgres.sh
 
   temporal:
-    image: temporalio/server:1.31.2
+    image: temporalio/server:1.32.1
     container_name: saga-temporal
     depends_on:
       temporal-schema-setup:
@@ -70,7 +70,7 @@ services:
       - ./docker/temporal/dynamicconfig:/etc/temporal/config/dynamicconfig:ro
 
   temporal-ui:
-    image: temporalio/ui:2.53.3
+    image: temporalio/ui:2.57.0
     container_name: saga-temporal-ui
     ports:
       - "8088:8080"
@@ -81,7 +81,7 @@ services:
       - temporal
 
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4:9.19
     container_name: saga-temporal-pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@example.com

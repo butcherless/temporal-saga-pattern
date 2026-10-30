@@ -75,11 +75,11 @@ Same Java 25 `JAVA_HOME` requirement as above. An Eclipse-JDT-based alternative 
 ### Local infra (PostgreSQL + Temporal)
 
 ```bash
-docker compose up -d      # postgres:5432, temporal:7233 (gRPC), temporal-ui:8088 (http://localhost:8088), pgadmin:5050
+docker compose up -d      # postgres:5434, temporal:7233 (gRPC), temporal-ui:8088 (http://localhost:8088), pgadmin:5050
 docker compose down       # stop; add -v to also drop the postgres/pgadmin volumes
 ```
 
-- PostgreSQL hosts only the three business databases (`order_db`, `inventory_db`, `payment_db`) — no `saga_orchestrator_db`. Credentials are `saga`/`saga` (`docker-compose.yml`'s `POSTGRES_USER`/`POSTGRES_PASSWORD`), not `postgres`; e.g. `docker exec saga-temporal-postgres psql -U saga -d order_db`.
+- PostgreSQL hosts only the three business databases (`order_db`, `inventory_db`, `payment_db`) — no `saga_orchestrator_db`. Its host port is `5434` (`DB_PORT` defaults to it), so it can run alongside other local Postgres containers on `5432`/`5433`; the container-internal port stays `5432`. Credentials are `saga`/`saga` (`docker-compose.yml`'s `POSTGRES_USER`/`POSTGRES_PASSWORD`), not `postgres`; e.g. `docker exec saga-temporal-postgres psql -U saga -d order_db`.
 - Temporal runs as `temporalio/server` + a one-shot `temporalio/admin-tools` schema-setup service against that same Postgres container, following the current officially-documented self-hosted pattern (`temporalio/samples-server`'s `compose/docker-compose-postgres.yml`) — `temporalio/auto-setup`, the older all-in-one image, is deprecated.
 - **Temporal Web UI (http://localhost:8088)** is the equivalent of `saga-pattern-poc`'s Kafka UI for this repo: open a Workflow Execution to see its full event history (every Activity call, its input/output, retries) — no separate `saga_step` table to query.
 

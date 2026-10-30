@@ -15,7 +15,7 @@ services:
       POSTGRES_PASSWORD: saga
       POSTGRES_MULTIPLE_DATABASES: order_db,inventory_db,payment_db
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       # Since PostgreSQL 18, the official image expects the mount point at /var/lib/postgresql
       # (not .../data): it stores data in a subdirectory named after the major version.

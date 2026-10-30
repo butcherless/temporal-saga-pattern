@@ -8,14 +8,14 @@ spring:
     problemdetails:
       enabled: true
   r2dbc:
-    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/inventory_db
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5434}/inventory_db
     username: ${DB_USERNAME:saga}
     password: ${DB_PASSWORD:saga}
   # JDBC datasource used only by Flyway and by DataSourceAutoConfiguration's primary
   # DataSource bean (re-imported in the application class); the app itself talks to
   # PostgreSQL reactively via spring.r2dbc above.
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/inventory_db
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5434}/inventory_db
     username: ${DB_USERNAME:saga}
     password: ${DB_PASSWORD:saga}
 
